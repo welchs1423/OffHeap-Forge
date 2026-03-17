@@ -1,35 +1,34 @@
 import java.lang.foreign.*;
+import java.lang.invoke.VarHandle;
 
 void main() {
-    // 1. 레이아웃 설정
-    var userLayout = MemoryLayout.structLayout(
-            ValueLayout.JAVA_INT.withName("id"),
-            MemoryLayout.paddingLayout(4),
-            ValueLayout.JAVA_DOUBLE.withName("score")
-    );
-    int elementCount = 1_000_000;
-    var arrayLayout = MemoryLayout.sequenceLayout(elementCount, userLayout);
+    // 1. 8바이트(long) 크기의 카운터 레이아웃
+    var layout = ValueLayout.JAVA_LONG;
+
+    // 2. 원자적 연산을 위한 VarHandle 생성
+    VarHandle atomicHandle = layout.varHandle();
 
     try (Arena arena = Arena.ofConfined()) {
-        MemorySegment bigSegment = arena.allocate(arrayLayout);
+        MemorySegment counter = arena.allocate(layout);
 
-        // 2. 500,000번째 위치에 데이터 하나만 써보기 (직접 계산 방식)
-        long offset = 500_000 * userLayout.byteSize();
-        bigSegment.set(ValueLayout.JAVA_INT, offset, 500);
-        bigSegment.set(ValueLayout.JAVA_DOUBLE, offset + 8, 99.9);
+        // 초기값 0 설정
+        atomicHandle.set(counter, 0L, 0L);
 
-        // 3. 🔥 Zero-copy Slice: 500,000번째 데이터만 바라보는 '가상 세그먼트' 생성
-        // 메모리 복사 0! 오직 주소값만 가리키는 16바이트짜리 '창문'입니다.
-        MemorySegment slice = bigSegment.asSlice(offset, userLayout.byteSize());
+        // 3. getAndAdd: 현재 값을 가져오고 100을 더함 (원자적 연산)
+        // 여러 스레드가 동시에 붙어도 데이터가 꼬이지 않는 마법입니다.
+        long oldValue = (long) atomicHandle.getAndAdd(counter, 0L, 100L);
+        long newValue = (long) atomicHandle.get(counter, 0L);
 
         System.out.println("---------------------------------");
-        System.out.println("전체 메모리 크기: " + bigSegment.byteSize() + " bytes");
-        System.out.println("슬라이스 크기: " + slice.byteSize() + " bytes (딱 1인분)");
+        System.out.println("이전 값(Old Value): " + oldValue);
+        System.out.println("현재 값(New Value): " + newValue);
 
-        // 4. 슬라이스를 통해 데이터 읽기 (슬라이스 기준으로는 0번지가 500,000번째 데이터)
-        System.out.println("슬라이스로 읽은 ID: " + slice.get(ValueLayout.JAVA_INT, 0));
-        System.out.println("슬라이스로 읽은 Score: " + slice.get(ValueLayout.JAVA_DOUBLE, 8));
+        // 4. Compare-And-Swap (CAS): 값이 100이면 500으로 바꿔라!
+        boolean success = atomicHandle.compareAndSet(counter, 0L, 100L, 500L);
+
+        System.out.println("CAS 성공 여부: " + success);
+        System.out.println("최종 값: " + atomicHandle.get(counter, 0L));
         System.out.println("---------------------------------");
-        System.out.println("OffHeap-Forge: Zero-copy Slicing Success");
+        System.out.println("OffHeap-Forge: Atomic Operations Mastered");
     }
 }
