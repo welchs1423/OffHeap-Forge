@@ -2,35 +2,45 @@ import java.lang.foreign.*;
 import java.lang.invoke.VarHandle;
 
 void main() {
-    // 1. 단일 사용자 구조체 레이아웃 (int + padding + double)
     var userLayout = MemoryLayout.structLayout(
             ValueLayout.JAVA_INT.withName("id"),
             MemoryLayout.paddingLayout(4),
             ValueLayout.JAVA_DOUBLE.withName("score")
     );
 
-    // 2. 구조체 10개를 이어 붙인 '시퀀스(배열)' 레이아웃 생성
-    var arrayLayout = MemoryLayout.sequenceLayout(10, userLayout);
+    // 1. 1,000,000개 (백만 개) 데이터 공간 설계
+    int elementCount = 1_000_000;
+    var arrayLayout = MemoryLayout.sequenceLayout(elementCount, userLayout);
 
-    // 3. 특정 인덱스에 접근하기 위한 VarHandle (포인터 연산의 현대적 방식)
-    // "5번째 유저의 id" 같은 위치를 자바가 계산해 주도록 설정합니다.
     VarHandle idHandle = arrayLayout.varHandle(
             MemoryLayout.PathElement.sequenceElement(),
             MemoryLayout.PathElement.groupElement("id")
     );
+    VarHandle scoreHandle = arrayLayout.varHandle(
+            MemoryLayout.PathElement.sequenceElement(),
+            MemoryLayout.PathElement.groupElement("score")
+    );
 
     try (Arena arena = Arena.ofConfined()) {
-        // 10명분 메모리 한 번에 할당 (160바이트)
+        long startTime = System.currentTimeMillis();
+
+        // 2. 백만 개 분량의 메모리 할당 (약 16MB)
         MemorySegment segment = arena.allocate(arrayLayout);
 
-        // 4. 5번째 사용자(인덱스 4)의 ID를 777로 설정
-        // 직접 오프셋을 계산하지 않아도 idHandle이 알아서 위치를 찾아갑니다.
-        idHandle.set(segment, 0L, 4L, 777);
+        // 3. 루프를 돌며 백만 개 데이터 채우기
+        for (long i = 0; i < elementCount; i++) {
+            idHandle.set(segment, 0L, i, (int) i);
+            scoreHandle.set(segment, 0L, i, i * 1.5);
+        }
+
+        long endTime = System.currentTimeMillis();
 
         System.out.println("---------------------------------");
-        System.out.println("배열 전체 크기: " + arrayLayout.byteSize() + " bytes");
-        System.out.println("5번째 사용자 ID: " + idHandle.get(segment, 0L, 4L));
+        System.out.println("데이터 개수: " + elementCount + " 개");
+        System.out.println("메모리 할당 크기: " + arrayLayout.byteSize() / 1024 / 1024 + " MB");
+        System.out.println("소요 시간: " + (endTime - startTime) + " ms");
+        System.out.println("마지막 데이터 ID: " + idHandle.get(segment, 0L, (long) elementCount - 1));
         System.out.println("---------------------------------");
-        System.out.println("OffHeap-Forge: SequenceLayout Success");
+        System.out.println("OffHeap-Forge: Massive Scale Test Success");
     }
 }
