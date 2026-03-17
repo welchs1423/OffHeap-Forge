@@ -1,12 +1,3 @@
-# IntelliJ IDEA 관련
 .idea/
-*.iml
 out/
-gen/
-
-# 빌드 결과물
-build/
-
-# OS 관련
-.DS_Store
-Thumbs.db
+*.iml
