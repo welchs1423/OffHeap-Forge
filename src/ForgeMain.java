@@ -1,47 +1,52 @@
-import java.io.File;
-import java.nio.file.Files;
-import java.lang.reflect.Method;
+import java.lang.invoke.VarHandle;
+import java.lang.invoke.MethodHandles;
 
-public class ForgeMain {
-    public static void main(String[] args) throws Exception {
-        File classFile = new File("hotdeploy/PluginAlgorithm.class");
-        long lastModified = 0;
-        Object pluginInstance = null;
-        Method processMethod = null;
+// 이 클래스는 public이 아니므로 ForgeMain.java 안에 함께 있어도 됩니다.
+class Sequence {
+    // 64바이트 캐시 라인을 채우기 위한 앞단 패딩 (8바이트 * 7 = 56바이트)
+    protected long p1, p2, p3, p4, p5, p6, p7;
 
-        System.out.println("Zero Downtime Hot Swap Engine Start");
-        System.out.println("Monitoring hotdeploy directory for class changes");
+    // 실제 데이터 (8바이트) -> 앞단 패딩과 합쳐져 딱 64바이트가 됩니다.
+    private volatile long value = 0;
 
-        while (true) {
-            if (classFile.exists() && classFile.lastModified() > lastModified) {
-                lastModified = classFile.lastModified();
-                System.out.println("New class detected Hot swapping at runtime");
+    // 뒷단 패딩 (8바이트 * 7 = 56바이트) -> 다른 객체와의 간격 확보
+    protected long p8, p9, p10, p11, p12, p13, p14;
 
-                byte[] classBytes = Files.readAllBytes(classFile.toPath());
+    private static final VarHandle VALUE_HANDLE;
 
-                ClassLoader hotLoader = new ClassLoader() {
-                    @Override
-                    protected Class<?> findClass(String name) {
-                        return defineClass(name, classBytes, 0, classBytes.length);
-                    }
-                };
-
-                Class<?> pluginClass = hotLoader.loadClass("PluginAlgorithm");
-                pluginInstance = pluginClass.getDeclaredConstructor().newInstance();
-                processMethod = pluginClass.getMethod("process", long.class);
-
-                System.out.println("Hot Swap Complete Resuming traffic processing");
-            }
-
-            if (pluginInstance != null && processMethod != null) {
-                long mockTraffic = System.currentTimeMillis() % 100;
-                long result = (long) processMethod.invoke(pluginInstance, mockTraffic);
-                System.out.println("Traffic In " + mockTraffic + " Processed Out " + result);
-            } else {
-                System.out.println("Waiting for initial PluginAlgorithm class deployment");
-            }
-
-            Thread.sleep(2000);
+    static {
+        try {
+            VALUE_HANDLE = MethodHandles.lookup()
+                    .findVarHandle(Sequence.class, "value", long.class);
+        } catch (ReflectiveOperationException e) {
+            throw new Error(e);
         }
+    }
+
+    public long get() {
+        return value;
+    }
+
+    public void set(long newValue) {
+        VALUE_HANDLE.setVolatile(this, newValue);
+    }
+}
+
+// 파일 이름은 반드시 ForgeMain.java 여야 합니다.
+public class ForgeMain {
+    public static void main(String[] args) {
+        Sequence seq = new Sequence();
+
+        System.out.println("Mechanical Sympathy: Cache Line Padding Activated");
+        long start = System.nanoTime();
+
+        // 1억 번의 원자적 업데이트 테스트
+        for (long i = 0; i < 100000000; i++) {
+            seq.set(i);
+        }
+
+        long end = System.nanoTime();
+        System.out.println("100 Million Atomic Updates Complete");
+        System.out.println("Execution Time: " + (end - start) / 1000000 + " ms");
     }
 }
