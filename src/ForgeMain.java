@@ -4,34 +4,42 @@ import java.lang.foreign.ValueLayout;
 
 public class ForgeMain {
     public static void main(String[] args) {
-        long poolSize = 1024 * 1024 * 1024;
-        long objectSize = 64;
+        long capacity = 2000000;
+        long slotSize = 16;
+        long hashMemorySize = capacity * slotSize;
 
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment memoryPool = arena.allocate(poolSize);
-            long currentOffset = 0;
+            MemorySegment hashTable = arena.allocate(hashMemorySize);
 
-            System.out.println("Zero-GC Slab Allocator Start 1GB Pool");
+            System.out.println("Off-Heap Hash Index Engine Start");
             long startTime = System.nanoTime();
 
-            int allocationCount = 1000000;
-            for (int i = 0; i < allocationCount; i++) {
-                long assignedOffset = currentOffset;
-                currentOffset += objectSize;
+            long targetKey = 999999L;
+            long targetValue = 7777777L;
 
-                if (currentOffset <= poolSize) {
-                    MemorySegment objectSpace = memoryPool.asSlice(assignedOffset, objectSize);
-                    objectSpace.set(ValueLayout.JAVA_LONG, 0, (long) i);
-                } else {
-                    System.out.println("Out of Memory in Custom Pool");
-                    break;
-                }
-            }
+            long hash = (targetKey ^ (targetKey >>> 16)) % capacity;
+            long offset = hash * slotSize;
+
+            hashTable.set(ValueLayout.JAVA_LONG, offset, targetKey);
+            hashTable.set(ValueLayout.JAVA_LONG, offset + 8, targetValue);
+
+            long searchKey = 999999L;
+            long searchHash = (searchKey ^ (searchKey >>> 16)) % capacity;
+            long searchOffset = searchHash * slotSize;
+
+            long foundKey = hashTable.get(ValueLayout.JAVA_LONG, searchOffset);
+            long foundValue = hashTable.get(ValueLayout.JAVA_LONG, searchOffset + 8);
 
             long endTime = System.nanoTime();
-            System.out.println("Allocated 1000000 Objects in Off-Heap without OS Calls");
-            System.out.println("Execution Time: " + (endTime - startTime) / 1000000 + " ms");
-            System.out.println("Used Memory: " + currentOffset + " bytes");
+
+            if (foundKey == searchKey) {
+                System.out.println("Data Found!");
+                System.out.println("Search Key: " + foundKey);
+                System.out.println("Found Value: " + foundValue);
+                System.out.println("Execution Time: " + (endTime - startTime) + " ns");
+            } else {
+                System.out.println("Data Not Found");
+            }
         }
     }
 }
