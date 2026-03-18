@@ -1,54 +1,53 @@
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.lang.invoke.VarHandle;
 
 void main() throws Exception {
     Path filePath = Path.of("ipc_queue.bin");
-    try (FileChannel channel = FileChannel.open(filePath,
+    try (FileChannel fileChannel = FileChannel.open(filePath,
+            StandardOpenOption.CREATE,
             StandardOpenOption.READ,
             StandardOpenOption.WRITE);
-         Arena arena = Arena.ofShared()) {
+         Arena arena = Arena.ofShared();
+         ServerSocketChannel serverSocket = ServerSocketChannel.open()) {
 
         long queueCapacity = 10000;
         long elementSize = 8;
         long headerSize = 8;
         long fileSize = headerSize + (queueCapacity * elementSize);
 
-        MemorySegment mmap = channel.map(FileChannel.MapMode.READ_WRITE, 0, fileSize, arena);
+        MemorySegment mmap = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileSize, arena);
         VarHandle indexHandle = ValueLayout.JAVA_LONG.varHandle();
 
-        long readIndex = 0;
-        long emptySpinCount = 0;
-        long maxSpins = 1000;
+        serverSocket.bind(new InetSocketAddress(8080));
+        System.out.println("NIO API Gateway Start: http://localhost:8080");
+        System.out.println("Open your web browser and connect to the address above.");
 
-        System.out.println("Consumer Start");
+        SocketChannel client = serverSocket.accept();
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+        client.read(buffer);
 
-        while (emptySpinCount < maxSpins) {
-            long writeIndex = (long) indexHandle.getVolatile(mmap, 0L);
+        long currentIndex = (long) indexHandle.getAndAdd(mmap, 0L, 1L);
+        long safeIndex = currentIndex % queueCapacity;
+        long dataOffset = headerSize + (safeIndex * elementSize);
 
-            if (readIndex < writeIndex) {
-                long safeIndex = readIndex % queueCapacity;
-                long dataOffset = headerSize + (safeIndex * elementSize);
+        long orderId = System.currentTimeMillis();
+        mmap.set(ValueLayout.JAVA_LONG, dataOffset, orderId);
 
-                long data = mmap.get(ValueLayout.JAVA_LONG, dataOffset);
+        String response = "HTTP/1.1 200 OK\r\n\r\nOrder Inserted: " + orderId;
+        client.write(ByteBuffer.wrap(response.getBytes()));
+        client.close();
 
-                if (readIndex % 2000 == 0 || readIndex == writeIndex - 1) {
-                    System.out.println("Read Index: " + readIndex + " / Data: " + data);
-                }
-
-                readIndex++;
-                emptySpinCount = 0;
-            } else {
-                emptySpinCount++;
-                Thread.sleep(1);
-            }
-        }
-
-        System.out.println("Consumer End");
-        System.out.println("Total Processed: " + readIndex);
+        System.out.println("Network Request Processed");
+        System.out.println("Assigned Order ID: " + orderId);
+        System.out.println("OffHeap Index: " + currentIndex);
     }
 }
