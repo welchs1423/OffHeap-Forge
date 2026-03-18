@@ -1,44 +1,50 @@
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 public class ForgeMain {
-    public static void main(String[] args) {
-        long capacity = 2000000;
+    public static void main(String[] args) throws Exception {
+        long capacity = 100000;
         long slotSize = 16;
-        long hashMemorySize = capacity * slotSize;
+        long fileSize = capacity * slotSize;
 
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment hashTable = arena.allocate(hashMemorySize);
+        Path dbPath = Path.of("local_nosql.bin");
 
-            System.out.println("Off-Heap Hash Index Engine Start");
-            long startTime = System.nanoTime();
+        try (FileChannel channel = FileChannel.open(dbPath,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.READ,
+                StandardOpenOption.WRITE);
+             Arena arena = Arena.ofShared()) {
 
-            long targetKey = 999999L;
-            long targetValue = 7777777L;
+            MemorySegment mmapDb = channel.map(FileChannel.MapMode.READ_WRITE, 0, fileSize, arena);
 
-            long hash = (targetKey ^ (targetKey >>> 16)) % capacity;
+            System.out.println("Persistent NoSQL Engine Start");
+
+            long insertKey = 8282;
+            long insertValue = 10041004;
+
+            long hash = (insertKey ^ (insertKey >>> 16)) % capacity;
             long offset = hash * slotSize;
 
-            hashTable.set(ValueLayout.JAVA_LONG, offset, targetKey);
-            hashTable.set(ValueLayout.JAVA_LONG, offset + 8, targetValue);
+            mmapDb.set(ValueLayout.JAVA_LONG, offset, insertKey);
+            mmapDb.set(ValueLayout.JAVA_LONG, offset + 8, insertValue);
 
-            long searchKey = 999999L;
-            long searchHash = (searchKey ^ (searchKey >>> 16)) % capacity;
-            long searchOffset = searchHash * slotSize;
+            System.out.println("Data Written to Disk via MMAP (Zero-Copy)");
 
-            long foundKey = hashTable.get(ValueLayout.JAVA_LONG, searchOffset);
-            long foundValue = hashTable.get(ValueLayout.JAVA_LONG, searchOffset + 8);
+            long readHash = (insertKey ^ (insertKey >>> 16)) % capacity;
+            long readOffset = readHash * slotSize;
 
-            long endTime = System.nanoTime();
+            long foundKey = mmapDb.get(ValueLayout.JAVA_LONG, readOffset);
+            long foundValue = mmapDb.get(ValueLayout.JAVA_LONG, readOffset + 8);
 
-            if (foundKey == searchKey) {
-                System.out.println("Data Found!");
-                System.out.println("Search Key: " + foundKey);
-                System.out.println("Found Value: " + foundValue);
-                System.out.println("Execution Time: " + (endTime - startTime) + " ns");
-            } else {
-                System.out.println("Data Not Found");
+            if (foundKey == insertKey) {
+                System.out.println("Data Retrieved Directly from OS Cache");
+                System.out.println("Key: " + foundKey);
+                System.out.println("Value: " + foundValue);
+                System.out.println("Check local_nosql.bin in your project folder!");
             }
         }
     }
