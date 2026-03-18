@@ -1,51 +1,47 @@
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.nio.channels.FileChannel;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.io.File;
+import java.nio.file.Files;
+import java.lang.reflect.Method;
 
 public class ForgeMain {
     public static void main(String[] args) throws Exception {
-        long capacity = 100000;
-        long slotSize = 16;
-        long fileSize = capacity * slotSize;
+        File classFile = new File("hotdeploy/PluginAlgorithm.class");
+        long lastModified = 0;
+        Object pluginInstance = null;
+        Method processMethod = null;
 
-        Path dbPath = Path.of("local_nosql.bin");
+        System.out.println("Zero Downtime Hot Swap Engine Start");
+        System.out.println("Monitoring hotdeploy directory for class changes");
 
-        try (FileChannel channel = FileChannel.open(dbPath,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.READ,
-                StandardOpenOption.WRITE);
-             Arena arena = Arena.ofShared()) {
+        while (true) {
+            if (classFile.exists() && classFile.lastModified() > lastModified) {
+                lastModified = classFile.lastModified();
+                System.out.println("New class detected Hot swapping at runtime");
 
-            MemorySegment mmapDb = channel.map(FileChannel.MapMode.READ_WRITE, 0, fileSize, arena);
+                byte[] classBytes = Files.readAllBytes(classFile.toPath());
 
-            System.out.println("Persistent NoSQL Engine Start");
+                ClassLoader hotLoader = new ClassLoader() {
+                    @Override
+                    protected Class<?> findClass(String name) {
+                        return defineClass(name, classBytes, 0, classBytes.length);
+                    }
+                };
 
-            long insertKey = 8282;
-            long insertValue = 10041004;
+                Class<?> pluginClass = hotLoader.loadClass("PluginAlgorithm");
+                pluginInstance = pluginClass.getDeclaredConstructor().newInstance();
+                processMethod = pluginClass.getMethod("process", long.class);
 
-            long hash = (insertKey ^ (insertKey >>> 16)) % capacity;
-            long offset = hash * slotSize;
-
-            mmapDb.set(ValueLayout.JAVA_LONG, offset, insertKey);
-            mmapDb.set(ValueLayout.JAVA_LONG, offset + 8, insertValue);
-
-            System.out.println("Data Written to Disk via MMAP (Zero-Copy)");
-
-            long readHash = (insertKey ^ (insertKey >>> 16)) % capacity;
-            long readOffset = readHash * slotSize;
-
-            long foundKey = mmapDb.get(ValueLayout.JAVA_LONG, readOffset);
-            long foundValue = mmapDb.get(ValueLayout.JAVA_LONG, readOffset + 8);
-
-            if (foundKey == insertKey) {
-                System.out.println("Data Retrieved Directly from OS Cache");
-                System.out.println("Key: " + foundKey);
-                System.out.println("Value: " + foundValue);
-                System.out.println("Check local_nosql.bin in your project folder!");
+                System.out.println("Hot Swap Complete Resuming traffic processing");
             }
+
+            if (pluginInstance != null && processMethod != null) {
+                long mockTraffic = System.currentTimeMillis() % 100;
+                long result = (long) processMethod.invoke(pluginInstance, mockTraffic);
+                System.out.println("Traffic In " + mockTraffic + " Processed Out " + result);
+            } else {
+                System.out.println("Waiting for initial PluginAlgorithm class deployment");
+            }
+
+            Thread.sleep(2000);
         }
     }
 }
