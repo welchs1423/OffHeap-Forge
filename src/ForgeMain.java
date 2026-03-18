@@ -1,37 +1,43 @@
 import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
-import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
-import java.lang.invoke.MethodHandle;
+import java.nio.channels.FileChannel;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
-void main() throws Throwable {
-    System.load(Path.of("engine.dll").toAbsolutePath().toString());
-
-    Linker linker = Linker.nativeLinker();
-    SymbolLookup lookup = SymbolLookup.loaderLookup();
-
-    MethodHandle calculateRisk = linker.downcallHandle(
-            lookup.find("calculateRisk").get(),
-            FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT)
-    );
+void main() throws Exception {
+    long dataSize = 1024 * 1024 * 16;
+    Path snapshotPath = Path.of("snapshot.bin");
 
     try (Arena arena = Arena.ofConfined()) {
-        int size = 10000;
-        MemorySegment nativeArray = arena.allocate(ValueLayout.JAVA_LONG, size);
+        MemorySegment memoryDb = arena.allocate(dataSize);
+        memoryDb.set(ValueLayout.JAVA_LONG, 0, 20260319L);
+        memoryDb.set(ValueLayout.JAVA_DOUBLE, 8, 99.99);
 
-        for (int i = 0; i < size; i++) {
-            nativeArray.setAtIndex(ValueLayout.JAVA_LONG, i, i + 1);
+        System.out.println("In Memory DB Running");
+        System.out.println("Original Data ID: " + memoryDb.get(ValueLayout.JAVA_LONG, 0));
+
+        try (FileChannel channel = FileChannel.open(snapshotPath,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.READ,
+                StandardOpenOption.WRITE)) {
+
+            MemorySegment mmapFile = channel.map(FileChannel.MapMode.READ_WRITE, 0, dataSize, arena);
+            MemorySegment.copy(memoryDb, 0, mmapFile, 0, dataSize);
+
+            System.out.println("Snapshot Dump Complete snapshot.bin");
         }
 
-        long startTime = System.nanoTime();
-        long result = (long) calculateRisk.invokeExact(nativeArray, size);
-        long endTime = System.nanoTime();
+        memoryDb.fill((byte) 0);
+        System.out.println("System Crashed Data in RAM: " + memoryDb.get(ValueLayout.JAVA_LONG, 0));
 
-        System.out.println("FFM Native Downcall Success");
-        System.out.println("Calculated Risk Sum: " + result);
-        System.out.println("Execution Time: " + (endTime - startTime) + " ns");
+        try (FileChannel channel = FileChannel.open(snapshotPath, StandardOpenOption.READ)) {
+            MemorySegment mmapFile = channel.map(FileChannel.MapMode.READ_ONLY, 0, dataSize, arena);
+            MemorySegment.copy(mmapFile, 0, memoryDb, 0, dataSize);
+
+            System.out.println("System Recovered from Snapshot");
+            System.out.println("Restored Data ID: " + memoryDb.get(ValueLayout.JAVA_LONG, 0));
+            System.out.println("Restored Data Value: " + memoryDb.get(ValueLayout.JAVA_DOUBLE, 8));
+        }
     }
 }
