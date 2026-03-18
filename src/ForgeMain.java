@@ -1,43 +1,45 @@
 import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
-import java.nio.channels.FileChannel;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 
-void main() throws Exception {
-    long dataSize = 1024 * 1024 * 16;
-    Path snapshotPath = Path.of("snapshot.bin");
+public class ForgeMain {
 
-    try (Arena arena = Arena.ofConfined()) {
-        MemorySegment memoryDb = arena.allocate(dataSize);
-        memoryDb.set(ValueLayout.JAVA_LONG, 0, 20260319L);
-        memoryDb.set(ValueLayout.JAVA_DOUBLE, 8, 99.99);
+    public static void onProgress(int current) {
+        System.out.println("C Engine Callback Received Processed Count: " + current);
+    }
 
-        System.out.println("In Memory DB Running");
-        System.out.println("Original Data ID: " + memoryDb.get(ValueLayout.JAVA_LONG, 0));
+    public static void main(String[] args) throws Throwable {
+        System.load(Path.of("callback_engine.dll").toAbsolutePath().toString());
 
-        try (FileChannel channel = FileChannel.open(snapshotPath,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.READ,
-                StandardOpenOption.WRITE)) {
+        Linker linker = Linker.nativeLinker();
+        SymbolLookup lookup = SymbolLookup.loaderLookup();
 
-            MemorySegment mmapFile = channel.map(FileChannel.MapMode.READ_WRITE, 0, dataSize, arena);
-            MemorySegment.copy(memoryDb, 0, mmapFile, 0, dataSize);
+        MethodHandle processWithCallback = linker.downcallHandle(
+                lookup.find("processWithCallback").get(),
+                FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.ADDRESS)
+        );
 
-            System.out.println("Snapshot Dump Complete snapshot.bin");
-        }
+        MethodHandle javaCallbackHandle = MethodHandles.lookup().findStatic(
+                ForgeMain.class, "onProgress", MethodType.methodType(void.class, int.class)
+        );
 
-        memoryDb.fill((byte) 0);
-        System.out.println("System Crashed Data in RAM: " + memoryDb.get(ValueLayout.JAVA_LONG, 0));
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment callbackStub = linker.upcallStub(
+                    javaCallbackHandle,
+                    FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT),
+                    arena
+            );
 
-        try (FileChannel channel = FileChannel.open(snapshotPath, StandardOpenOption.READ)) {
-            MemorySegment mmapFile = channel.map(FileChannel.MapMode.READ_ONLY, 0, dataSize, arena);
-            MemorySegment.copy(mmapFile, 0, memoryDb, 0, dataSize);
-
-            System.out.println("System Recovered from Snapshot");
-            System.out.println("Restored Data ID: " + memoryDb.get(ValueLayout.JAVA_LONG, 0));
-            System.out.println("Restored Data Value: " + memoryDb.get(ValueLayout.JAVA_DOUBLE, 8));
+            System.out.println("FFM Native Upcall Start");
+            processWithCallback.invokeExact(3000, callbackStub);
+            System.out.println("C Engine Processing Complete");
         }
     }
 }
