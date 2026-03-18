@@ -1,34 +1,55 @@
-import java.net.InetSocketAddress;
-import java.nio.channels.FileChannel;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.nio.ByteBuffer;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.lang.invoke.VarHandle;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 
 void main() throws Exception {
-    Path filePath = Path.of("ipc_queue.bin");
-    try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.READ);
-         ServerSocketChannel serverSocket = ServerSocketChannel.open()) {
+    long cacheLineSize = 64;
 
-        serverSocket.bind(new InetSocketAddress(8080));
-        System.out.println("Zero-Copy Server Start: http://localhost:8080");
-        System.out.println("Connect with your browser to download the offheap queue data.");
+    MemoryLayout paddedLayout = MemoryLayout.structLayout(
+            ValueLayout.JAVA_LONG.withName("value"),
+            MemoryLayout.paddingLayout(56)
+    );
 
-        SocketChannel client = serverSocket.accept();
+    int threadCount = 4;
+    MemoryLayout arrayLayout = MemoryLayout.sequenceLayout(threadCount, paddedLayout);
 
-        long fileSize = fileChannel.size();
-        String header = "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: application/octet-stream\r\n" +
-                "Content-Length: " + fileSize + "\r\n" +
-                "Content-Disposition: attachment; filename=\"queue_dump.bin\"\r\n\r\n";
+    VarHandle valueHandle = arrayLayout.varHandle(
+            MemoryLayout.PathElement.sequenceElement(),
+            MemoryLayout.PathElement.groupElement("value")
+    );
 
-        client.write(ByteBuffer.wrap(header.getBytes()));
+    try (Arena arena = Arena.ofShared()) {
+        MemorySegment segment = arena.allocate(arrayLayout);
+        CountDownLatch latch = new CountDownLatch(threadCount);
 
-        long transferred = fileChannel.transferTo(0, fileSize, client);
+        long startTime = System.currentTimeMillis();
 
-        client.close();
-        System.out.println("Zero-Copy Transfer Complete");
-        System.out.println("Transferred Bytes: " + transferred);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 0; i < threadCount; i++) {
+                final int threadIndex = i;
+                executor.submit(() -> {
+                    long iterations = 10000000L;
+                    for (long j = 0; j < iterations; j++) {
+                        long current = (long) valueHandle.get(segment, 0L, (long) threadIndex);
+                        valueHandle.set(segment, 0L, (long) threadIndex, current + 1L);
+                    }
+                    latch.countDown();
+                });
+            }
+        }
+
+        latch.await();
+        long endTime = System.currentTimeMillis();
+
+        System.out.println("False Sharing Prevented Architecture");
+        System.out.println("Total Time: " + (endTime - startTime) + " ms");
+
+        for (int i = 0; i < threadCount; i++) {
+            System.out.println("Thread " + i + " Value: " + valueHandle.get(segment, 0L, (long) i));
+        }
     }
 }
