@@ -1,41 +1,37 @@
-import jdk.jfr.Category;
-import jdk.jfr.Event;
-import jdk.jfr.Label;
-import jdk.jfr.Name;
-
-@Name("OffHeap.Engine.Metric")
-@Label("Engine Metric")
-@Category("OffHeapForge")
-class EngineMetricEvent extends Event {
-    @Label("Processed Count")
-    long processedCount;
-
-    @Label("Latency Nanos")
-    long latencyNanos;
-}
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 
 public class ForgeMain {
     public static void main(String[] args) {
-        System.out.println("Zero-Overhead JFR Telemetry Start");
+        long poolSize = 1024 * 1024 * 1024;
+        long objectSize = 64;
 
-        long count = 5000000;
-        long startTime = System.nanoTime();
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment memoryPool = arena.allocate(poolSize);
+            long currentOffset = 0;
 
-        for (long i = 0; i < count; i++) {
-            EngineMetricEvent event = new EngineMetricEvent();
-            event.begin();
+            System.out.println("Zero-GC Slab Allocator Start 1GB Pool");
+            long startTime = System.nanoTime();
 
-            long dummyWork = i * 2;
+            int allocationCount = 1000000;
+            for (int i = 0; i < allocationCount; i++) {
+                long assignedOffset = currentOffset;
+                currentOffset += objectSize;
 
-            if (event.isEnabled()) {
-                event.processedCount = i;
-                event.latencyNanos = System.nanoTime() - startTime;
-                event.commit();
+                if (currentOffset <= poolSize) {
+                    MemorySegment objectSpace = memoryPool.asSlice(assignedOffset, objectSize);
+                    objectSpace.set(ValueLayout.JAVA_LONG, 0, (long) i);
+                } else {
+                    System.out.println("Out of Memory in Custom Pool");
+                    break;
+                }
             }
-        }
 
-        System.out.println("JFR Events Committed to JVM Memory Buffer");
-        System.out.println("Total Events: " + count);
-        System.out.println("Now the JVM internal ring buffer holds these metrics with < 1% overhead.");
+            long endTime = System.nanoTime();
+            System.out.println("Allocated 1000000 Objects in Off-Heap without OS Calls");
+            System.out.println("Execution Time: " + (endTime - startTime) / 1000000 + " ms");
+            System.out.println("Used Memory: " + currentOffset + " bytes");
+        }
     }
 }
