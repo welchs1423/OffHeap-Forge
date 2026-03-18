@@ -5,13 +5,10 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.lang.invoke.VarHandle;
-import java.util.concurrent.Executors;
-import java.util.concurrent.CountDownLatch;
 
 void main() throws Exception {
     Path filePath = Path.of("ipc_queue.bin");
     try (FileChannel channel = FileChannel.open(filePath,
-            StandardOpenOption.CREATE,
             StandardOpenOption.READ,
             StandardOpenOption.WRITE);
          Arena arena = Arena.ofShared()) {
@@ -24,33 +21,34 @@ void main() throws Exception {
         MemorySegment mmap = channel.map(FileChannel.MapMode.READ_WRITE, 0, fileSize, arena);
         VarHandle indexHandle = ValueLayout.JAVA_LONG.varHandle();
 
-        mmap.set(ValueLayout.JAVA_LONG, 0, 0L);
+        long readIndex = 0;
+        long emptySpinCount = 0;
+        long maxSpins = 1000;
 
-        int threadCount = 10000;
-        CountDownLatch latch = new CountDownLatch(threadCount);
+        System.out.println("Consumer Start");
 
-        long startTime = System.currentTimeMillis();
+        while (emptySpinCount < maxSpins) {
+            long writeIndex = (long) indexHandle.getVolatile(mmap, 0L);
 
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (int i = 0; i < threadCount; i++) {
-                final int threadId = i;
-                executor.submit(() -> {
-                    long currentIndex = (long) indexHandle.getAndAdd(mmap, 0L, 1L);
-                    long safeIndex = currentIndex % queueCapacity;
-                    long dataOffset = headerSize + (safeIndex * elementSize);
+            if (readIndex < writeIndex) {
+                long safeIndex = readIndex % queueCapacity;
+                long dataOffset = headerSize + (safeIndex * elementSize);
 
-                    mmap.set(ValueLayout.JAVA_LONG, dataOffset, (long) threadId);
-                    latch.countDown();
-                });
+                long data = mmap.get(ValueLayout.JAVA_LONG, dataOffset);
+
+                if (readIndex % 2000 == 0 || readIndex == writeIndex - 1) {
+                    System.out.println("Read Index: " + readIndex + " / Data: " + data);
+                }
+
+                readIndex++;
+                emptySpinCount = 0;
+            } else {
+                emptySpinCount++;
+                Thread.sleep(1);
             }
         }
 
-        latch.await();
-        long endTime = System.currentTimeMillis();
-
-        System.out.println("Stress Test Complete");
-        System.out.println("Target Threads: " + threadCount);
-        System.out.println("Final Index Header: " + mmap.get(ValueLayout.JAVA_LONG, 0));
-        System.out.println("Elapsed Time: " + (endTime - startTime) + " ms");
+        System.out.println("Consumer End");
+        System.out.println("Total Processed: " + readIndex);
     }
 }
