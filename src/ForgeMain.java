@@ -1,55 +1,37 @@
 import java.lang.foreign.Arena;
-import java.lang.foreign.MemoryLayout;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
-import java.lang.invoke.VarHandle;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
+import java.lang.invoke.MethodHandle;
+import java.nio.file.Path;
 
-void main() throws Exception {
-    long cacheLineSize = 64;
+void main() throws Throwable {
+    System.load(Path.of("engine.dll").toAbsolutePath().toString());
 
-    MemoryLayout paddedLayout = MemoryLayout.structLayout(
-            ValueLayout.JAVA_LONG.withName("value"),
-            MemoryLayout.paddingLayout(56)
+    Linker linker = Linker.nativeLinker();
+    SymbolLookup lookup = SymbolLookup.loaderLookup();
+
+    MethodHandle calculateRisk = linker.downcallHandle(
+            lookup.find("calculateRisk").get(),
+            FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT)
     );
 
-    int threadCount = 4;
-    MemoryLayout arrayLayout = MemoryLayout.sequenceLayout(threadCount, paddedLayout);
+    try (Arena arena = Arena.ofConfined()) {
+        int size = 10000;
+        MemorySegment nativeArray = arena.allocate(ValueLayout.JAVA_LONG, size);
 
-    VarHandle valueHandle = arrayLayout.varHandle(
-            MemoryLayout.PathElement.sequenceElement(),
-            MemoryLayout.PathElement.groupElement("value")
-    );
-
-    try (Arena arena = Arena.ofShared()) {
-        MemorySegment segment = arena.allocate(arrayLayout);
-        CountDownLatch latch = new CountDownLatch(threadCount);
-
-        long startTime = System.currentTimeMillis();
-
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (int i = 0; i < threadCount; i++) {
-                final int threadIndex = i;
-                executor.submit(() -> {
-                    long iterations = 10000000L;
-                    for (long j = 0; j < iterations; j++) {
-                        long current = (long) valueHandle.get(segment, 0L, (long) threadIndex);
-                        valueHandle.set(segment, 0L, (long) threadIndex, current + 1L);
-                    }
-                    latch.countDown();
-                });
-            }
+        for (int i = 0; i < size; i++) {
+            nativeArray.setAtIndex(ValueLayout.JAVA_LONG, i, i + 1);
         }
 
-        latch.await();
-        long endTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
+        long result = (long) calculateRisk.invokeExact(nativeArray, size);
+        long endTime = System.nanoTime();
 
-        System.out.println("False Sharing Prevented Architecture");
-        System.out.println("Total Time: " + (endTime - startTime) + " ms");
-
-        for (int i = 0; i < threadCount; i++) {
-            System.out.println("Thread " + i + " Value: " + valueHandle.get(segment, 0L, (long) i));
-        }
+        System.out.println("FFM Native Downcall Success");
+        System.out.println("Calculated Risk Sum: " + result);
+        System.out.println("Execution Time: " + (endTime - startTime) + " ns");
     }
 }
