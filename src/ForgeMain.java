@@ -4,34 +4,35 @@ import java.lang.foreign.ValueLayout;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.lang.invoke.VarHandle;
 
 void main() throws Exception {
-    Path filePath = Path.of("offheap_data.bin");
-
+    Path filePath = Path.of("ipc_queue.bin");
     try (FileChannel channel = FileChannel.open(filePath,
             StandardOpenOption.CREATE,
             StandardOpenOption.READ,
             StandardOpenOption.WRITE);
          Arena arena = Arena.ofConfined()) {
 
-        long fileSize = 1024;
+        long queueCapacity = 1024;
+        long elementSize = 8;
+        long headerSize = 8;
+        long fileSize = headerSize + (queueCapacity * elementSize);
 
-        MemorySegment mmapSegment = channel.map(
-                FileChannel.MapMode.READ_WRITE,
-                0,
-                fileSize,
-                arena
-        );
+        MemorySegment mmap = channel.map(FileChannel.MapMode.READ_WRITE, 0, fileSize, arena);
+        VarHandle indexHandle = ValueLayout.JAVA_LONG.varHandle();
 
-        mmapSegment.set(ValueLayout.JAVA_LONG, 0, 20260318L);
-        mmapSegment.set(ValueLayout.JAVA_DOUBLE, 8, 3.14159);
+        long currentIndex = (long) indexHandle.getAndAdd(mmap, 0L, 1L);
+        long safeIndex = currentIndex % queueCapacity;
 
-        long readLong = mmapSegment.get(ValueLayout.JAVA_LONG, 0);
-        double readDouble = mmapSegment.get(ValueLayout.JAVA_DOUBLE, 8);
+        long dataOffset = headerSize + (safeIndex * elementSize);
 
-        System.out.println("MMAP System Start");
-        System.out.println("Read Long: " + readLong);
-        System.out.println("Read Double: " + readDouble);
-        System.out.println("Check the offheap_data.bin file in your project folder.");
+        long businessData = 9999L + currentIndex;
+        mmap.set(ValueLayout.JAVA_LONG, dataOffset, businessData);
+
+        System.out.println("Ring Buffer Write Success");
+        System.out.println("Absolute Index: " + currentIndex);
+        System.out.println("Circular Index: " + safeIndex);
+        System.out.println("Written Data: " + businessData);
     }
 }
