@@ -11,6 +11,8 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import com.sun.net.httpserver.HttpServer;
+import java.io.OutputStream;
 
 class PaddedSequence {
     protected long p1, p2, p3, p4, p5, p6, p7;
@@ -35,26 +37,43 @@ public class ForgeMain {
             PaddedSequence head = new PaddedSequence();
             PaddedSequence tail = new PaddedSequence();
 
+            // 1. 프로메테우스 메트릭 노출용 내장 HTTP 서버 (Port 9090)
+            HttpServer metricsServer = HttpServer.create(new InetSocketAddress(9090), 0);
+            metricsServer.createContext("/metrics", exchange -> {
+                // 프로메테우스 포맷으로 현재 처리된 총량(head.get())을 응답
+                String response = "# HELP offheap_forge_processed_total Total messages processed\n" +
+                        "# TYPE offheap_forge_processed_total counter\n" +
+                        "offheap_forge_processed_total " + head.get() + "\n";
+                exchange.sendResponseHeaders(200, response.getBytes().length);
+                OutputStream os = exchange.getResponseBody();
+                os.write(response.getBytes());
+                os.close();
+            });
+            metricsServer.setExecutor(null);
+            metricsServer.start();
+            System.out.println("Telemetry Exporter Online (Port 9090) - Ready for Prometheus");
+
+            // 2. 기존 엔진 네트워크 포트 (Port 9999)
             ServerSocketChannel serverChannel = ServerSocketChannel.open();
             serverChannel.bind(new InetSocketAddress(9999));
             serverChannel.configureBlocking(false);
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-
             System.out.println("Zero-Contention Network Engine Online (Port 9999)");
 
-            // [Consumer Thread] 오프힙 메모리 실시간 감시 및 처리
+            // [Consumer Thread]
             Thread consumer = new Thread(() -> {
                 while (true) {
                     while (tail.get() == head.get()) { Thread.onSpinWait(); }
                     long data = ringBuffer.getAtIndex(ValueLayout.JAVA_LONG, (int)(head.get() & MASK));
-                    System.out.println("-> [Engine Out] Processed Data: " + data);
+                    // 초고속 처리를 위해 콘솔 출력은 이제 주석 처리하거나 최소화합니다.
+                    // System.out.println("-> [Engine Out] Processed Data: " + data);
                     head.set(head.get() + 1);
                 }
             });
             consumer.setDaemon(true);
             consumer.start();
 
-            // [Main Thread] 네트워크 수신 로직
+            // [Main Thread - Producer]
             while (true) {
                 selector.select();
                 Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
@@ -65,7 +84,6 @@ public class ForgeMain {
                         SocketChannel client = serverChannel.accept();
                         client.configureBlocking(false);
                         client.register(selector, SelectionKey.OP_READ);
-                        System.out.println("New Traffic Source Connected!");
                     } else if (key.isReadable()) {
                         SocketChannel client = (SocketChannel) key.channel();
                         ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);

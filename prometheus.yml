@@ -1,0 +1,7 @@
+﻿global:
+  scrape_interval: 1s
+
+scrape_configs:
+  - job_name: 'offheap-forge'
+    static_configs:
+      - targets: ['172.30.1.93:9090']
