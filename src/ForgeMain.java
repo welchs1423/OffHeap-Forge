@@ -1,18 +1,13 @@
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
+import java.lang.foreign.*;
+import java.lang.invoke.*;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+import java.nio.*;
+import java.nio.channels.*;
 import java.util.Iterator;
 import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 class PaddedSequence {
     protected long p1, p2, p3, p4, p5, p6, p7;
@@ -21,29 +16,26 @@ class PaddedSequence {
     private static final VarHandle HANDLE;
     static {
         try { HANDLE = MethodHandles.lookup().findVarHandle(PaddedSequence.class, "value", long.class); }
-        catch (ReflectiveOperationException e) { throw new Error(e); }
+        catch (Exception e) { throw new Error(e); }
     }
     public long get() { return value; }
     public void set(long v) { HANDLE.setVolatile(this, v); }
 }
 
 public class ForgeMain {
-    private static final int CAPACITY = 1024;
-    private static final int MASK = CAPACITY - 1;
-
     public static void main(String[] args) throws Exception {
         try (Arena arena = Arena.ofShared(); Selector selector = Selector.open()) {
-            MemorySegment ringBuffer = arena.allocate(ValueLayout.JAVA_LONG, CAPACITY);
+
+            FileChannel channel = FileChannel.open(Path.of("forge-data.dat"), StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
+            MemorySegment ringBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, 1024 * 8L, arena);
+
             PaddedSequence head = new PaddedSequence();
             PaddedSequence tail = new PaddedSequence();
 
-            // 1. 프로메테우스 메트릭 노출용 내장 HTTP 서버 (Port 9090)
             HttpServer metricsServer = HttpServer.create(new InetSocketAddress(9090), 0);
             metricsServer.createContext("/metrics", exchange -> {
-                // 프로메테우스 포맷으로 현재 처리된 총량(head.get())을 응답
-                String response = "# HELP offheap_forge_processed_total Total messages processed\n" +
-                        "# TYPE offheap_forge_processed_total counter\n" +
-                        "offheap_forge_processed_total " + head.get() + "\n";
+                String response = "# HELP offheap_forge_processed_total Total messages processed\n# TYPE offheap_forge_processed_total counter\noffheap_forge_processed_total " + head.get() + "\n";
+                exchange.getResponseHeaders().set("Content-Type", "text/plain; version=0.0.4");
                 exchange.sendResponseHeaders(200, response.getBytes().length);
                 OutputStream os = exchange.getResponseBody();
                 os.write(response.getBytes());
@@ -53,27 +45,22 @@ public class ForgeMain {
             metricsServer.start();
             System.out.println("Telemetry Exporter Online (Port 9090) - Ready for Prometheus");
 
-            // 2. 기존 엔진 네트워크 포트 (Port 9999)
             ServerSocketChannel serverChannel = ServerSocketChannel.open();
             serverChannel.bind(new InetSocketAddress(9999));
             serverChannel.configureBlocking(false);
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
             System.out.println("Zero-Contention Network Engine Online (Port 9999)");
 
-            // [Consumer Thread]
             Thread consumer = new Thread(() -> {
                 while (true) {
                     while (tail.get() == head.get()) { Thread.onSpinWait(); }
-                    long data = ringBuffer.getAtIndex(ValueLayout.JAVA_LONG, (int)(head.get() & MASK));
-                    // 초고속 처리를 위해 콘솔 출력은 이제 주석 처리하거나 최소화합니다.
-                    // System.out.println("-> [Engine Out] Processed Data: " + data);
+                    ringBuffer.getAtIndex(ValueLayout.JAVA_LONG, (int)(head.get() & 1023));
                     head.set(head.get() + 1);
                 }
             });
             consumer.setDaemon(true);
             consumer.start();
 
-            // [Main Thread - Producer]
             while (true) {
                 selector.select();
                 Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
@@ -89,8 +76,8 @@ public class ForgeMain {
                         ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
                         if (client.read(buffer) == 8) {
                             buffer.flip();
-                            if (tail.get() - head.get() < CAPACITY) {
-                                ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, (int)(tail.get() & MASK), buffer.getLong());
+                            if (tail.get() - head.get() < 1024) {
+                                ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, (int)(tail.get() & 1023), buffer.getLong());
                                 tail.set(tail.get() + 1);
                             }
                         }
