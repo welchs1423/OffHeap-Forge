@@ -33,7 +33,7 @@ public class ForgeMain {
     public static void main(String[] args) throws Exception {
         try (Arena arena = Arena.ofShared(); Selector selector = Selector.open()) {
             FileChannel channel = FileChannel.open(Path.of("forge-data.dat"), StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
-            MemorySegment ringBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, 1024 * 8L, arena);
+            MemorySegment ringBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, (1024 + 1) * 8L, arena);
 
             PaddedSequence head = new PaddedSequence();
             PaddedSequence tail = new PaddedSequence();
@@ -154,9 +154,13 @@ public class ForgeMain {
                         ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
                         if (client.read(buffer) == 8) {
                             buffer.flip();
-                            if (tail.get() - head.get() < 1024) {
-                                ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, (int)(tail.get() & 1023), buffer.getLong());
-                                tail.set(tail.get() + 1);
+                            long currentTail = tail.get();
+                            if (currentTail - head.get() < 1024) {
+                                int index = (int)(currentTail & 1023);
+                                ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, index, buffer.getLong());
+                                tail.set(currentTail + 1);
+
+                                ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, 1024, tail.get());
                             }
                         }
                     }

@@ -1,81 +1,98 @@
-# 🚀 OffHeap-Forge: High-Performance Data Engine
+# 🚀 OffHeap-Forge
 
-JDK 22+의 **Foreign Function & Memory (FFM) API**를 활용하여 자바의 성능 한계에 도전하고, 하드웨어의 물리적 특성을 소프트웨어 아키텍처로 승화시킨 초저지연 데이터 엔진입니다.
+JDK 22+의 FFM API와 Rust를 결합하여 언어의 경계를 허물고, 하드웨어의 극한 성능을 뽑아내는 초저지연 데이터 엔진입니다. 자바의 생산성과 러스트의 무자비한 성능을 공유 메모리(mmap)로 연결하여 단 1바이트의 복사도 없는 Zero-Copy 파이프라인을 구축합니다.
 
-## 🎯 Project Core Essence
-> **자바의 가비지 컬렉션(GC)을 우회하고, CPU 캐시 라인을 직접 제어하며, 네트워크 트래픽을 나노초 단위로 처리합니다.**
+## 🛠 기술 스택
+
+* **Language**: Java 22+ (Main Engine), Rust (High-Speed Analyzer), C/C++ (Native Bridge)
+* **Framework/API**: JDK Foreign Function & Memory (FFM) API, Vector API (SIMD)
+* **Database**: Oracle DB 21c (XE)
+* **Library**: `memmap2` (Rust), OJDBC8
+* **Infrastructure**: Docker, Prometheus, Grafana
+
+## 💡 핵심 구현 기술
+
+* **Zero-Copy Persistence**: `mmap` 기술을 활용하여 디스크와 메모리를 물아일체로 관리, 가비지 컬렉션(GC) 부하를 완전히 제거했습니다.
+* **SIMD DB Flusher**: JDK Vector API를 사용하여 오프힙 데이터를 4개씩 묶어 처리함으로써 Oracle DB 벌크 인서트 성능을 극대화했습니다.
+* **Shared Cursor IPC**: 자바와 러스트가 공유 메모리의 '커서(Head/Tail)'를 실시간 동기화하여, **O(1) 시간 복잡도**로 데이터를 점프하며 읽어오는 초저지연 통신을 구현했습니다.
+* **Cache-Line Optimization**: 64-byte Padding을 적용하여 멀티스레드 환경에서의 경합(False Sharing)을 방지, **5.7ns**의 업데이트 지연시간을 달성했습니다.
+
+## 📅 업데이트 내역
+
+### 🟧 [Season 3] Scalability & Connectivity (2026.03 ~ )
+* **Phase 39**: Rust 측 실시간 데이터 필터링 및 임계치 감지(Alerting) 로직 완성
+* **Phase 38**: Shared Cursor(Head/Tail) 동기화를 통한 **O(1) Jump** 조회 최적화 구현
+* **Phase 37**: `memmap2` 라이브러리를 활용한 Rust 기반 Zero-Copy 메모리 리더 구축
+* **Phase 36**: JDK Vector API(SIMD) 기반 Oracle DB 비동기 Bulk Flusher 파이프라인 완성
+
+### 🟩 [Season 2] Operational Excellence (2025.12 ~ 2026.02)
+* **Phase 35**: mmap 기반 **Phoenix Recovery**(자가 복구) 로직 및 데이터 영속성 검증
+* **Phase 34**: 67,130 TPS 도달 시의 네트워크 병목 지점 파악 및 최적화 리포트 작성
+* **Phase 33**: Grafana 커스텀 대시보드 구축 및 실시간 트래픽 가시성 확보
+* **Phase 32**: Prometheus 규격 메트릭 익스포터 구축 및 엔드포인트(/metrics) 활성화
+* **Phase 31**: 오프힙 데이터 스냅샷 및 증분 백업 시스템 프로토타입 제작
+* **Phase 30**: 운영 환경 모니터링을 위한 Docker-Compose 기반 인프라 스택 구성
+
+### 🟦 [Season 1] The Core of Speed (2025.09 ~ 2025.11)
+* **Phase 29**: Java NIO Selector 기반 초저지연 비동기 TCP 게이트웨이 완공
+* **Phase 28**: **5.7ns** Latency 달성 및 Atomic 연산 성능 벤치마크 완료
+* **Phase 27**: 64-byte Cache Line Padding 적용으로 False Sharing 원천 차단
+* **Phase 26**: CAS(Compare-And-Swap) 기반 무경합(Lock-Free) 인덱스 관리자 구현
+* **Phase 25**: 고속 메모리 재사용을 위한 슬래브 할당기(Slab Allocator) 알고리즘 적용
+* **Phase 24**: MemoryLayout 기반 하드웨어 정렬(Alignment) 데이터 구조체 설계
+* **Phase 23**: VarHandle 기반 메모리 직접 접근 및 Volatile 가시성 확보
+* **Phase 22**: Arena 기반 오프힙 메모리 생명주기 관리 및 자원 누수 방지 로직 구축
+* **Phase 21**: Native 메모리 직접 할당(malloc) 및 세그먼트 경계 보호 로직 구현
+* **Phase 20**: 매뉴얼 메모리 해제를 통한 Zero-GC(가비지 컬렉터 무력화) 환경 달성
+* **Phase 19**: FFM API 기반 메모리 주소 역참조 및 포인터 연산 안정화
+* **Phase 18**: 하드웨어 최적화를 위한 Little-Endian 바이트 순서 고정 로직 적용
+* **Phase 17**: MemorySegment 슬라이싱을 통한 대용량 데이터 파티셔닝 기술 구현
+* **Phase 16**: JMH(Java Microbenchmark Harness) 기반 성능 측정 프레임워크 도입
+* **Phase 15**: 싱글 스레드 환경에서의 메모리 처리량(Throughput) 한계 측정
+* **Phase 14**: 오프힙 저장 전용 데이터 모델(Schema) 정의 및 직렬화 제거
+* **Phase 13**: Memory-mapped file I/O 프로토타입 제작 및 디스크 동기화 테스트
+* **Phase 12**: FFM API를 활용한 외부 C 네이티브 라이브러리 링크 기술 검증
+* **Phase 11**: 가상 메모리 주소 계산을 위한 커스텀 오프셋 계산 로직 구축
+* **Phase 10**: 멀티스레드 동시 접근 시의 데이터 무결성 테스트 시나리오 수행
+* **Phase 09**: Native 메모리 영역에서의 원자적 연산(Atomic) 프로토콜 설계
+* **Phase 08**: 고효율 데이터 수신을 위한 오프힙 버퍼 풀링(Pooling) 시스템 구축
+* **Phase 07**: 오프힙 기반 원형 큐(Ring Buffer) 개념 증명 및 설계 완료
+* **Phase 06**: Java 22 FFM(Foreign Function & Memory) API 개발 환경 세팅
+* **Phase 05**: Direct ByteBuffer와 MemorySegment 간 성능 비교 분석
+* **Phase 04**: 엔진 코어 아키텍처 및 넌블로킹(Non-blocking) 데이터 흐름 설계
+* **Phase 03**: 나노초(Nanosecond) 단위 처리 성능 목표 및 KPI 설정
+* **Phase 02**: CPU 캐시 라인 크기 감지 및 하드웨어 가속 전략 수립
+* **Phase 01**: OffHeap-Forge 프로젝트 초기화 및 기본 클래스 구조 생성
 
 ---
 
-## 📈 Performance & Metrics
-시즌 1(속도)과 시즌 2(안정성)를 거치며 달성한 핵심 기술 지표입니다.
+## 🚀 How to Run
 
-| Category | Performance | Technical Insight |
-| :--- | :--- | :--- |
-| **Update Latency** | **5.7ns / op** | 100M Atomic Updates (Phase 28) |
-| **Throughput** | **67,130+ TPS** | PowerShell TCP Client Limit Reach |
-| **GC Overhead** | **0ms (Zero-GC)** | Slab Allocator & Off-Heap Memory |
-| **Durability** | **Zero-Copy** | mmap based Crash Recovery |
+엔진의 정상 작동을 위해 Java 엔진을 먼저 가동한 후 Rust 컨슈머를 실행해야 합니다.
 
----
+### 1. Prerequisites
+* **Oracle DB**: `system/oracle` 계정으로 접속 가능한 상태여야 함
+* **Rust**: `cargo` 명령어가 환경 변수에 등록되어 있어야 함
 
-## 🏗️ System Architecture
-데이터 유입부터 영구 저장까지 **경합 제로(Zero-Contention)** 파이프라인으로 설계되었습니다.
+### 2. Terminal 1: Java Main Engine
+```powershell
+# Compile
+javac --add-modules jdk.incubator.vector src/ForgeMain.java
 
-1. **Ingestion Layer**: Java NIO Selector 기반의 초저지연 비동기 TCP 게이트웨이.
-2. **Buffer Layer**: FFM API 기반의 Memory-Mapped Off-Heap 링 버퍼.
-3. **Execution Layer**: Cache-Line Padding이 적용된 무경합 인덱스 관리자.
-4. **Observability Layer**: 메인 로직 간섭 없는 Zero-Overhead 텔레메트리 (Prometheus).
-5. **Persistence Layer**: mmap 기술을 활용한 디스크 물아일체 저장 및 자가 복구.
-6. **Integration Layer (New)**: Vector API(SIMD) 기반 RDBMS 초고속 비동기 벌크 플러셔.
-
----
-
-## 🛠️ Project Journey: Season 1 ~ 3
-
-### 🟦 [Season 1] The Core of Speed (Phase 0 ~ 29)
-**목표: 자바의 한계를 부수는 극한의 로우 레벨 최적화 및 엔진 기초 구축**
-* **Memory Management**: Arena 할당, MemoryLayout 정렬, Zero-GC Slab Allocator 구현 완료.
-* **Hardware & Concurrency**: CAS 기반 Lock-Free 제어 및 64-byte Cache Line Padding 적용 (**5.7ns 달성**).
-* **Networking & Gateway**: Java NIO Selector 기반 초저지연 TCP 게이트웨이 완공.
-
-### 🟩 [Season 2] Operational Excellence (Phase 30 ~ 35)
-**목표: 실전 운영을 위한 실시간 관측(Monitoring) 및 영속성(Persistence) 확보**
-* **Observability**: Prometheus 규격 메트릭 익스포터 구축 및 Grafana 실시간 모니터링 연동 (**67K TPS** 성능 검증).
-* **Persistence**: Memory-Mapped File (mmap) 기술을 이용한 디스크 물아일체 저장 및 **Phoenix Recovery**(자가 복구) 로직 완성.
-
-### 🟧 [Season 3] Scalability & Connectivity (Phase 36 ~ )
-**목표: 단일 노드를 넘어선 영토 확장 및 폴리글랏 생태계 구축**
-* **Database Integration**
-  * [x] **Phase 36**: JDK Vector API(SIMD) 기반 오프힙 메모리 초고속 싹쓸이 및 Oracle DB 벌크 인서트(Batch) 비동기 파이프라인 구축 완료.
-
----
-
-## 🚀 Getting Started
-
-### 1. 엔진 및 모니터링 스택 가동
-```bash
-# 자바 엔진 실행 (Vector API 활성화 및 JDBC 드라이버 포함)
-javac --add-modules jdk.incubator.vector ForgeMain.java
-java -cp ".;ojdbc8.jar" --add-modules jdk.incubator.vector ForgeMain
-
-# Docker 모니터링 스택 실행 (Prometheus, Grafana)
-docker-compose up -d
+# Run
+java -cp "src;.;ojdbc8.jar" --add-modules jdk.incubator.vector ForgeMain
 ```
 
-### 2. 스트레스 테스트 (PowerShell)
+### 3. Terminal 2: Rust High-Speed Consumer
+```powershell
+cd pipeline-rust
+cargo run
+```
+
+### 4. Terminal 3: Traffic Injection (Testing)
 ```powershell
 $client = New-Object System.Net.Sockets.TcpClient("127.0.0.1", 9999);
 $stream = $client.GetStream();
-1..8 | ForEach-Object {
-    $data = [BitConverter]::GetBytes([long]($_ * 7777));
-    $stream.Write($data, 0, $data.Length);
-}
+$stream.Write([BitConverter]::GetBytes([long]77777), 0, 8);
 $client.Close();
 ```
-
----
-
-## 🌊 Roadmap for Season 3 (Next Steps)
-- **Polyglot Expansion**: Rust/Go 언어와의 Zero-Copy IPC 브릿지 완성.
-- **Cluster Replication**: 다중 노드 간 오프힙 데이터 미러링 구현.
