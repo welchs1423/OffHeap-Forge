@@ -12,7 +12,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cursor_offset = 1024 * 8;
     let mut last_read_idx: u64 = 0;
 
-    // 실시간 통계를 위한 변수들
     let mut total_count = 0;
     let mut alert_count = 0;
 
@@ -25,14 +24,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let data_offset = (target_idx * 8) as usize;
             let val = u64::from_le_bytes((&mmap[data_offset..data_offset + 8]).try_into()?);
 
-            total_count += 1;
+            total_count += 1; // 이제 이 값을 사용합니다!
 
-            // ⚡ [실시간 가공] 50,000 이상의 데이터만 특별 관리!
             if val >= 50000 {
                 alert_count += 1;
-                println!("🚨 [ALERT] High Value Detected: {} (Total Alerts: {})", val, alert_count);
+                println!("🚨 [ALERT #{}] High Value: {} (Total processed: {})", alert_count, val, total_count);
             } else {
-                println!("✅ [Normal] Data Received: {}", val);
+                println!("✅ [Normal] Value: {} (Total processed: {})", val, total_count);
             }
 
             last_read_idx = current_java_tail;
