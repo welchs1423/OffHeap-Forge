@@ -1,5 +1,6 @@
-.idea/
-out/
-*.iml
 *.class
 *.jar
+*.bin
+*.dat
+*.exe
+*.dll
