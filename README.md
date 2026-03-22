@@ -2,17 +2,6 @@
 
 JDK 22+의 FFM API와 Rust를 결합하여 언어의 경계를 허물고, 하드웨어의 극한 성능을 뽑아내는 초저지연 데이터 엔진입니다. 자바의 생산성과 러스트의 무자비한 성능을 공유 메모리(mmap)로 연결하여 단 1바이트의 복사도 없는 Zero-Copy 파이프라인을 구축합니다.
 
-[ Traffic ] -> [ Java Engine (Off-Heap) ] <-> [ Rust Analyzer (mmap) ]
-|                                |
-v                                v
-[ Oracle DB 21c ] <----------- [ Prometheus/Grafana ]
-|
-v
-[ eGovFrame Web UI ] (Real-time Dashboard)
-
-네, 바로 복사해서 README.md에 붙여넣으실 수 있도록 TO-BE 버전의 마운다운 코드를 정리해 드립니다. 기존의 '기술 스택'과 '핵심 구현 기술' 부분을 이 내용으로 교체하시면 됩니다!
-
-Markdown
 ## 🛠 기술 스택 (Technical Stack)
 
 ### 🚀 Engine & Runtime
