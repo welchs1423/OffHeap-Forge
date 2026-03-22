@@ -5,8 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e41e0f52-560f-4428-bdd9-f4cd2c5dca8a" name="변경" comment="">
+      <change afterPath="$PROJECT_DIR$/native_core.c" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pipeline-rust/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/pipeline-rust/src/main.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/ForgeMain.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/ForgeMain.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -39,6 +39,9 @@
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 5

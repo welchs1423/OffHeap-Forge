@@ -32,27 +32,23 @@ public class ForgeMain {
 
     public static void main(String[] args) throws Exception {
         try (Arena arena = Arena.ofShared(); Selector selector = Selector.open()) {
+
+            // 🔥 [Phase 41] C Native Bridge 코드는 중괄호 { 가 열린 직후에 바로 넣습니다!
+            System.load(Path.of("native_core.dll").toAbsolutePath().toString());
+            SymbolLookup lookup = SymbolLookup.loaderLookup();
+            MethodHandle getHwTimer = Linker.nativeLinker().downcallHandle(
+                    lookup.find("get_hw_timer").orElseThrow(),
+                    FunctionDescriptor.of(ValueLayout.JAVA_LONG)
+            );
+
+            try {
+                long tick = (long) getHwTimer.invokeExact();
+                System.out.println("⚙️ [Native Bridge] C/C++ Hardware Timer Tick: " + tick);
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
             FileChannel channel = FileChannel.open(Path.of("forge-data.dat"), StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
             MemorySegment ringBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, (1024 + 1) * 8L, arena);
-
-            FileChannel feedbackChannel = FileChannel.open(Path.of("forge-feedback.dat"),
-                    StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
-            MemorySegment feedbackSegment = feedbackChannel.map(FileChannel.MapMode.READ_WRITE, 0, 8, arena);
-
-            // 2. 러스트 피드백 감시 스레드 가동
-            Thread feedbackWatcher = new Thread(() -> {
-                long lastAlertCount = 0;
-                while (true) {
-                    long currentAlertCount = feedbackSegment.get(ValueLayout.JAVA_LONG, 0);
-                    if (currentAlertCount > lastAlertCount) {
-                        System.out.println("[Java 엔진] Rust로부터 긴급 피드백 수신! 누적 경고 횟수: " + currentAlertCount);
-                        lastAlertCount = currentAlertCount;
-                    }
-                    try { Thread.sleep(10); } catch (Exception e) {}
-                }
-            });
-            feedbackWatcher.setDaemon(true);
-            feedbackWatcher.start();
 
             PaddedSequence head = new PaddedSequence();
             PaddedSequence tail = new PaddedSequence();
