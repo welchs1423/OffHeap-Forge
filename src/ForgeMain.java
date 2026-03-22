@@ -108,7 +108,6 @@ public class ForgeMain {
             metricsServer.start();
             System.out.println("Telemetry Exporter Online (Port 9090)");
 
-            // 🚀 [SEASON 3] Vectorized DB Flusher (Background Thread)
             Thread dbFlusher = new Thread(() -> {
                 System.out.println("💡 [SIMD Flusher] Thread is ALIVE! Starting initialization...");
                 try {
@@ -126,7 +125,13 @@ public class ForgeMain {
 
                     try (Connection conn = DriverManager.getConnection(url, props)) {
                         System.out.println("🚀 [Oracle DB] Connected! Vectorized Flusher Standby.");
-                        PreparedStatement pstmt = conn.prepareStatement("INSERT INTO FORGE_METRICS (SEQ_ID, METRIC_VAL) VALUES (?, ?)");
+
+                        // 🔥 [Phase 46] 기존 INSERT INTO 대신 멱등성(Idempotent) MERGE INTO 적용!
+                        String upsertSql = "MERGE INTO FORGE_METRICS t " +
+                                "USING (SELECT ? AS seq, ? AS val FROM dual) s " +
+                                "ON (t.SEQ_ID = s.seq) " +
+                                "WHEN NOT MATCHED THEN INSERT (SEQ_ID, METRIC_VAL) VALUES (s.seq, s.val)";
+                        PreparedStatement pstmt = conn.prepareStatement(upsertSql);
 
                         while (true) {
                             long currentHead = head.get();
