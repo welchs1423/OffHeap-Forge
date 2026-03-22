@@ -31,24 +31,53 @@ public class ForgeMain {
     private static final VectorSpecies<Long> SPECIES = LongVector.SPECIES_256;
 
     public static void main(String[] args) throws Exception {
+        // 🔥 [Phase 41 & 42] C Native Bridge 초기화 (스레드에서도 접근 가능하게 최상단으로 이동)
+        System.load(Path.of("native_core.dll").toAbsolutePath().toString());
+        SymbolLookup lookup = SymbolLookup.loaderLookup();
+
+        final MethodHandle getHwTimer = Linker.nativeLinker().downcallHandle(
+                lookup.find("get_hw_timer").orElseThrow(),
+                FunctionDescriptor.of(ValueLayout.JAVA_LONG)
+        );
+
+        final MethodHandle getHwFreq = Linker.nativeLinker().downcallHandle(
+                lookup.find("get_hw_freq").orElseThrow(),
+                FunctionDescriptor.of(ValueLayout.JAVA_LONG)
+        );
+
+        // 주파수(Frequency)를 미리 구해두고 상수로 고정
+        long tempFreq = 1;
+        try {
+            tempFreq = (long) getHwFreq.invokeExact();
+            long tick = (long) getHwTimer.invokeExact();
+            System.out.println("⚙️ [Native Bridge] C/C++ Hardware Timer Loaded! (Freq: " + tempFreq + ")");
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+        final long CPU_FREQ = tempFreq;
+
+
         try (Arena arena = Arena.ofShared(); Selector selector = Selector.open()) {
-
-            // 🔥 [Phase 41] C Native Bridge 코드는 중괄호 { 가 열린 직후에 바로 넣습니다!
-            System.load(Path.of("native_core.dll").toAbsolutePath().toString());
-            SymbolLookup lookup = SymbolLookup.loaderLookup();
-            MethodHandle getHwTimer = Linker.nativeLinker().downcallHandle(
-                    lookup.find("get_hw_timer").orElseThrow(),
-                    FunctionDescriptor.of(ValueLayout.JAVA_LONG)
-            );
-
-            try {
-                long tick = (long) getHwTimer.invokeExact();
-                System.out.println("⚙️ [Native Bridge] C/C++ Hardware Timer Tick: " + tick);
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }
             FileChannel channel = FileChannel.open(Path.of("forge-data.dat"), StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
             MemorySegment ringBuffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, (1024 + 1) * 8L, arena);
+
+            FileChannel feedbackChannel = FileChannel.open(Path.of("forge-feedback.dat"),
+                    StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
+            MemorySegment feedbackSegment = feedbackChannel.map(FileChannel.MapMode.READ_WRITE, 0, 8, arena);
+
+            Thread feedbackWatcher = new Thread(() -> {
+                long lastAlertCount = 0;
+                while (true) {
+                    long currentAlertCount = feedbackSegment.get(ValueLayout.JAVA_LONG, 0);
+                    if (currentAlertCount > lastAlertCount) {
+                        System.out.println("⚠️ [Java 엔진] Rust로부터 긴급 피드백 수신! 누적 경고 횟수: " + currentAlertCount);
+                        lastAlertCount = currentAlertCount;
+                    }
+                    try { Thread.sleep(10); } catch (Exception e) {}
+                }
+            });
+            feedbackWatcher.setDaemon(true);
+            feedbackWatcher.start();
 
             PaddedSequence head = new PaddedSequence();
             PaddedSequence tail = new PaddedSequence();
@@ -81,18 +110,16 @@ public class ForgeMain {
 
             // 🚀 [SEASON 3] Vectorized DB Flusher (Background Thread)
             Thread dbFlusher = new Thread(() -> {
-                // 스레드가 살아있는지 확인하는 생존 신고 로그!
                 System.out.println("💡 [SIMD Flusher] Thread is ALIVE! Starting initialization...");
                 try {
                     long flushHead = startHead;
                     long[] batchBuffer = new long[4];
 
-                    // 오라클 무한대기 방지용 드라이버 레벨 속성 강제 주입
                     java.util.Properties props = new java.util.Properties();
                     props.put("user", "system");
                     props.put("password", "oracle");
-                    props.put("oracle.net.CONNECT_TIMEOUT", "3000"); // 3초 연결 타임아웃
-                    props.put("oracle.jdbc.ReadTimeout", "3000");    // 3초 읽기 타임아웃
+                    props.put("oracle.net.CONNECT_TIMEOUT", "3000");
+                    props.put("oracle.jdbc.ReadTimeout", "3000");
 
                     String url = "jdbc:oracle:thin:@localhost:1521/XE";
                     System.out.println("⏳ [Oracle DB] Connecting to " + url + " ...");
@@ -105,10 +132,14 @@ public class ForgeMain {
                             long currentHead = head.get();
                             long available = currentHead - flushHead;
 
+                            // 데이터가 4건 이상 쌓였을 때 Bulk Insert 실행
                             if (available >= 4) {
                                 int ringIndex = (int)(flushHead & 1023);
 
                                 if (ringIndex <= 1024 - 4) {
+                                    // ⏱️ [측정 시작] C 하드웨어 타이머 찰칵!
+                                    long startTick = (long) getHwTimer.invokeExact();
+
                                     LongVector vec = LongVector.fromMemorySegment(SPECIES, ringBuffer, ringIndex * 8L, ByteOrder.LITTLE_ENDIAN);
                                     vec.intoArray(batchBuffer, 0);
 
@@ -118,8 +149,15 @@ public class ForgeMain {
                                         pstmt.addBatch();
                                     }
                                     pstmt.executeBatch();
+
+                                    // ⏱️ [측정 종료] C 하드웨어 타이머 찰칵!
+                                    long endTick = (long) getHwTimer.invokeExact();
+
+                                    // 틱 차이를 마이크로초(μs)로 계산
+                                    double elapsedMicros = (endTick - startTick) * 1_000_000.0 / CPU_FREQ;
+
                                     flushHead += 4;
-                                    System.out.println("⚡ [SIMD Flusher] 4건 Oracle Bulk Insert 완료!");
+                                    System.out.printf("⚡ [Profiler] 4건 Batch Insert 소요시간: %.2f μs\n", elapsedMicros);
                                 } else {
                                     pstmt.setLong(1, flushHead);
                                     pstmt.setLong(2, ringBuffer.getAtIndex(ValueLayout.JAVA_LONG, ringIndex));
@@ -127,11 +165,11 @@ public class ForgeMain {
                                     flushHead++;
                                 }
                             } else {
-                                Thread.sleep(100);
+                                Thread.sleep(10); // 부하를 줄이기 위해 10ms 대기
                             }
                         }
                     }
-                } catch (Throwable e) { // 🔥 치명적인 Error 급 오류까지 모두 포착!
+                } catch (Throwable e) {
                     System.err.println("⚠️ [DB Flusher FATAL ERROR] 원인: " + e.toString());
                     e.printStackTrace();
                 }
