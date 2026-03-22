@@ -1,18 +1,20 @@
 use memmap2::MmapOptions;
 use std::fs::OpenOptions;
+use std::io::Write; // 파일 쓰기용
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🦀 [Rust Analyzer] Two-Way IPC Mode Online!");
+    println!("🦀 [Rust Analyzer] Two-Way IPC & Audit Logger Online!");
 
-    // 1. 자바가 주는 데이터 파일 (읽기 전용)
     let file = OpenOptions::new().read(true).open("../forge-data.dat")?;
     let mmap = unsafe { MmapOptions::new().map(&file)? };
 
-    // 2. 🚀 [추가] 자바가 만든 우체통 파일 (읽기/쓰기 가능)
     let fb_file = OpenOptions::new().read(true).write(true).open("../forge-feedback.dat")?;
     let mut fb_mmap = unsafe { MmapOptions::new().map_mut(&fb_file)? };
+
+    // 🚀 [Phase 43] 감사 로그(Audit Log) 파일 열기 (없으면 만들고, 있으면 이어쓰기)
+    let mut log_file = OpenOptions::new().create(true).append(true).open("../alert_audit.log")?;
 
     let cursor_offset = 1024 * 8;
     let mut last_read_idx: u64 = 0;
@@ -33,12 +35,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             if val >= 50000 {
                 alert_count += 1;
-                println!("🚨 [ALERT #{}] High Value: {} (Total processed: {})", alert_count, val, total_count);
+                println!("🚨 [ALERT #{}] High Value: {} (Total: {})", alert_count, val, total_count);
 
-                // 🚀 [추가] 우체통(fb_mmap)의 첫 8바이트에 현재 경고 횟수(alert_count)를 덮어씀!
+                // 자바 우체통에 경고 횟수 업데이트
                 fb_mmap[0..8].copy_from_slice(&alert_count.to_le_bytes());
+
+                // 🚀 [Phase 43] JSON 형태로 로그 파일에 기록!
+                let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
+                let log_json = format!(r#"{{"timestamp": {}, "alert_id": {}, "value": {}}}"#, timestamp, alert_count, val);
+                writeln!(log_file, "{}", log_json)?;
             } else {
-                println!("✅ [Normal] Value: {} (Total processed: {})", val, total_count);
+                println!("✅ [Normal] Value: {} (Total: {})", val, total_count);
             }
 
             last_read_idx = current_java_tail;
