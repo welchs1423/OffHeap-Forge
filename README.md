@@ -15,11 +15,12 @@ JDK 22+의 FFM API와 Rust를 결합하여 언어의 경계를 허물고, 하드
 * **Zero-Copy Persistence**: `mmap` 기술을 활용하여 디스크와 메모리를 물아일체로 관리, 가비지 컬렉션(GC) 부하를 완전히 제거했습니다.
 * **SIMD DB Flusher**: JDK Vector API를 사용하여 오프힙 데이터를 4개씩 묶어 처리함으로써 Oracle DB 벌크 인서트 성능을 극대화했습니다.
 * **Shared Cursor IPC**: 자바와 러스트가 공유 메모리의 '커서(Head/Tail)'를 실시간 동기화하여, **O(1) 시간 복잡도**로 데이터를 점프하며 읽어오는 초저지연 통신을 구현했습니다.
-* **Cache-Line Optimization**: 64-byte Padding을 적용하여 멀티스레드 환경에서의 경합(False Sharing)을 방지, **5.7ns**의 업데이트 지연시간을 달성했습니다.
+* **Two-Way Shared Memory**: 네트워크 통신(TCP/HTTP) 없이 순수 OS 공유 메모리만으로 이기종 언어 간 실시간 피드백 채널을 구축했습니다.
 
 ## 📅 업데이트 내역
 
 ### 🟧 [Season 3] Scalability & Connectivity (2026.03 ~ )
+* **Phase 40**: Shared Memory 기반 Java ↔ Rust 양방향 Zero-Copy IPC (피드백 채널) 구축
 * **Phase 39**: Rust 측 실시간 데이터 필터링 및 임계치 감지(Alerting) 로직 완성
 * **Phase 38**: Shared Cursor(Head/Tail) 동기화를 통한 **O(1) Jump** 조회 최적화 구현
 * **Phase 37**: `memmap2` 라이브러리를 활용한 Rust 기반 Zero-Copy 메모리 리더 구축
@@ -93,6 +94,6 @@ cargo run
 ```powershell
 $client = New-Object System.Net.Sockets.TcpClient("127.0.0.1", 9999);
 $stream = $client.GetStream();
-$stream.Write([BitConverter]::GetBytes([long]77777), 0, 8);
+$stream.Write([BitConverter]::GetBytes([long]99999), 0, 8);
 $client.Close();
 ```
