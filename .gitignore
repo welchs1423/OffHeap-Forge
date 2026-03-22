@@ -5,3 +5,20 @@
 *.exe
 *.dll
 target/
+
+# --- IDE & Tool Settings ---
+.idea/
+.settings/
+.project
+.classpath
+.factorypath
+.smarttomcat/
+
+# --- Build Outputs ---
+**/target/
+**/*.class
+**/*.war
+
+# --- OS Stuff ---
+Thumbs.db
+.DS_Store
