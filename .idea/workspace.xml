@@ -5,10 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e41e0f52-560f-4428-bdd9-f4cd2c5dca8a" name="변경" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/jarRepositories.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ForgeWeb/src/main/java/egovframework/example/sample/service/ForgeVO.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/prometheus.yml" beforeDir="false" afterPath="$PROJECT_DIR$/prometheus.yml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -18,8 +20,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Class" />
         <option value="Python Script" />
+        <option value="Class" />
       </list>
     </option>
   </component>
@@ -38,6 +40,13 @@
     &quot;accountId&quot;: &quot;9bdaeca4-dcbe-4353-af2d-db065b8de094&quot;
   }
 }</component>
+  <component name="LogFilters">
+    <option name="FILTER_ERRORS" value="false" />
+    <option name="FILTER_WARNINGS" value="false" />
+    <option name="FILTER_INFO" value="true" />
+    <option name="FILTER_DEBUG" value="true" />
+    <option name="CUSTOM_FILTER" />
+  </component>
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
@@ -56,26 +65,28 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/DEV/IntelliJ IDEA Community Edition 2025.2.2/OffHeap-Forge/hotdeploy&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;모듈&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;reference.projectsettings.compiler.javacompiler&quot;,
-    &quot;애플리케이션.DbFlush.executor&quot;: &quot;Run&quot;,
-    &quot;애플리케이션.ForgeMain.executor&quot;: &quot;Run&quot;,
-    &quot;애플리케이션.NettyGate.executor&quot;: &quot;Run&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "Smart Tomcat.이름이 지정되지 않았습니다.executor": "Run",
+    "git-widget-placeholder": "main",
+    "ignore.virus.scanning.warn.message": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/DEV/IntelliJ IDEA Community Edition 2025.2.2/OffHeap-Forge/hotdeploy",
+    "project.structure.last.edited": "모듈",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "애플리케이션.DbFlush.executor": "Run",
+    "애플리케이션.ForgeMain.executor": "Run",
+    "애플리케이션.NettyGate.executor": "Run"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\DEV\IntelliJ IDEA Community Edition 2025.2.2\OffHeap-Forge\hotdeploy" />
@@ -84,7 +95,7 @@
       <recent name="C:\DEV\IntelliJ IDEA Community Edition 2025.2.2\OffHeap-Forge" />
     </key>
   </component>
-  <component name="RunManager" selected="애플리케이션.ForgeMain">
+  <component name="RunManager" selected="Smart Tomcat.이름이 지정되지 않았습니다">
     <configuration name="DbFlush" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="UNNAMED_CLASS_CONFIGURATION" value="true" />
       <option name="MAIN_CLASS_NAME" value="DbFlush" />
@@ -109,7 +120,44 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
+    <configuration name="이름이 지정되지 않았습니다" type="com.poratu.idea.plugins.tomcat" nameIsGenerated="true">
+      <predefined_log_file enabled="true" id="Tomcat Localhost Log" />
+      <predefined_log_file enabled="true" id="Tomcat Access Log" />
+      <predefined_log_file id="Tomcat Catalina Log" />
+      <predefined_log_file id="Tomcat Manager Log" />
+      <predefined_log_file id="Tomcat Host Manager Log" />
+      <option name="catalinaBase" value="C:\Users\park\.SmartTomcat\OffHeap-Forge\ForgeWeb" />
+      <option name="contextPath" value="/" />
+      <option name="docBase" value="$PROJECT_DIR$/ForgeWeb/src/main/webapp" />
+      <option name="envOptions">
+        <map />
+      </option>
+      <option name="extraClassPath" value="" />
+      <option name="tomcatInfo">
+        <TomcatInfo>
+          <option name="name" value="Apache Tomcat/9.0.115" />
+          <option name="path" value="$PROJECT_DIR$/../../apache-tomcat-9.0.115" />
+          <option name="version" value="9.0.115.0" />
+        </TomcatInfo>
+      </option>
+      <option name="vmOptions" value="" />
+      <module name="ForgeWeb" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="com.poratu.idea.plugins.tomcat">
+      <predefined_log_file enabled="true" id="Tomcat Localhost Log" />
+      <predefined_log_file enabled="true" id="Tomcat Access Log" />
+      <predefined_log_file id="Tomcat Catalina Log" />
+      <predefined_log_file id="Tomcat Manager Log" />
+      <predefined_log_file id="Tomcat Host Manager Log" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <list>
+      <item itemvalue="Smart Tomcat.이름이 지정되지 않았습니다" />
       <item itemvalue="애플리케이션.NettyGate" />
       <item itemvalue="애플리케이션.DbFlush" />
       <item itemvalue="애플리케이션.ForgeMain" />
@@ -138,5 +186,14 @@
       <updated>1773769355032</updated>
     </task>
     <servers />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="dependencySupport" implementationName="java:org.springframework:spring-core" />
+    <option featureType="dependencySupport" implementationName="executable:docker" />
+    <option featureType="dependencySupport" implementationName="java:org.seleniumhq.selenium:selenium-java" />
+    <option featureType="dependencySupport" implementationName="executable:kubectl" />
+    <option featureType="dependencySupport" implementationName="maven-packaging:war" />
+    <option featureType="dependencySupport" implementationName="java:javax.enterprise:cdi-api" />
+    <option featureType="dependencySupport" implementationName="java:org.springframework:spring-webmvc" />
   </component>
 </project>

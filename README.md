@@ -2,24 +2,54 @@
 
 JDK 22+의 FFM API와 Rust를 결합하여 언어의 경계를 허물고, 하드웨어의 극한 성능을 뽑아내는 초저지연 데이터 엔진입니다. 자바의 생산성과 러스트의 무자비한 성능을 공유 메모리(mmap)로 연결하여 단 1바이트의 복사도 없는 Zero-Copy 파이프라인을 구축합니다.
 
-## 🛠 기술 스택
+[ Traffic ] -> [ Java Engine (Off-Heap) ] <-> [ Rust Analyzer (mmap) ]
+|                                |
+v                                v
+[ Oracle DB 21c ] <----------- [ Prometheus/Grafana ]
+|
+v
+[ eGovFrame Web UI ] (Real-time Dashboard)
 
-* **Language**: Java 22+ (Main Engine), Rust (High-Speed Analyzer), C/C++ (Native Bridge)
-* **Framework/API**: JDK Foreign Function & Memory (FFM) API, Vector API (SIMD)
-* **Database**: Oracle DB 21c (XE)
+네, 바로 복사해서 README.md에 붙여넣으실 수 있도록 TO-BE 버전의 마운다운 코드를 정리해 드립니다. 기존의 '기술 스택'과 '핵심 구현 기술' 부분을 이 내용으로 교체하시면 됩니다!
+
+Markdown
+## 🛠 기술 스택 (Technical Stack)
+
+### 🚀 Engine & Runtime
+* **Runtime**: **JDK 25 (Early Access)**
+* **Language**: **Java 25**, **Rust** (High-Speed Analyzer), **C/C++** (Native Bridge)
+* **Core API**: **FFM (Foreign Function & Memory)**, **Vector API (SIMD)**, **MemoryLayout**
+
+### 🌐 Web & Enterprise
+* **Framework**: **eGovFrame 4.3 (Spring 5.3.37)**
+* **Web Server**: **Apache Tomcat 9.0.115**
+* **Persistence**: **MyBatis 3.5**, **DBCP2** (High-performance Connection Pool)
+* **Frontend**: **Terminal-inspired Matrix UI** (JSP, JSTL, CSS3)
+
+### 📊 Data & Infrastructure
+* **Database**: **Oracle DB 21c (XE)**
 * **Library**: `memmap2` (Rust), OJDBC8
-* **Infrastructure**: Docker, Prometheus, Grafana
+* **Infrastructure**: **Docker**, **Prometheus**, **Grafana** (Full-stack Monitoring)
 
-## 💡 핵심 구현 기술
+---
 
-* **Zero-Copy Persistence**: `mmap` 기술을 활용하여 디스크와 메모리를 물아일체로 관리, 가비지 컬렉션(GC) 부하를 완전히 제거했습니다.
-* **SIMD DB Flusher**: JDK Vector API를 사용하여 오프힙 데이터를 4개씩 묶어 처리함으로써 Oracle DB 벌크 인서트 성능을 극대화했습니다.
-* **Shared Cursor IPC**: 자바와 러스트가 공유 메모리의 '커서(Head/Tail)'를 실시간 동기화하여, **O(1) 시간 복잡도**로 데이터를 점프하며 읽어오는 초저지연 통신을 구현했습니다.
-* **Two-Way Shared Memory**: 네트워크 통신(TCP/HTTP) 없이 순수 OS 공유 메모리만으로 이기종 언어 간 실시간 피드백 채널을 구축했습니다.
+## 💡 핵심 구현 기술 (Key Implementation)
+
+### ⚡ Extreme Performance
+* **Zero-Copy Persistence**: `mmap` 기술을 활용해 디스크와 메모리를 동기화하여 가비지 컬렉션(GC) 오버헤드를 0%로 수렴시켰습니다.
+* **SIMD DB Flusher**: JDK Vector API를 통해 오프힙 데이터를 256-bit 단위로 병렬 처리, Oracle DB 벌크 인서트 처리량을 극대화했습니다.
+* **O(1) Shared Cursor IPC**: 자바와 러스트가 공유 메모리의 '커서'를 실시간 동기화하여, 데이터 복사 없이 상호 간의 포인터를 점프하며 읽어오는 초저지연 통신을 구현했습니다.
+
+### 🛠️ Legacy Modernization
+* **JDK 25 Bridge**: 10년 이상의 역사를 가진 eGovFrame 템플릿을 최신 **JDK 25** 환경에 이식하기 위해, 구형 라이브러리(Lombok 등)의 의존성을 제거하고 **정통 Spring DI** 방식으로 재설계했습니다.
+* **Polyglot Full-Stack Connectivity**: 네트워크 오버헤드가 없는 **OS 공유 메모리(Shared Memory)**를 통해 자바-러스트-오라클-웹 UI까지 이어지는 통합 데이터 파이프라인을 구축했습니다.
+* **Real-time Matrix Dashboard**: 초당 수만 건이 쏟아지는 오프힙 엔진의 상태를 별도의 복사 과정 없이 MyBatis 매퍼를 통해 실시간으로 시각화했습니다.
 
 ## 📅 업데이트 내역
 
 ### 🟧 [Season 3] Scalability & Connectivity (2026.03 ~ )
+* **Phase 49**: JDK 25 기반의 Off-heap 엔진 데이터를 eGovFrame WebUI로 실시간 이식 성공 (Legacy Modernization)
+* **Phase 48**: Modern Legacy - eGovFrame 4.3 프로젝트 생성 및 JDK 25 환경 이식 완료 (Lombok 제거 및 정통 Spring DI 전환)
 * **Phase 47**: Prometheus & Grafana 연동을 통한 실시간 초당 처리량(TPS) 모니터링 대시보드 구축 완료
 * **Phase 46**: `MERGE INTO` (Upsert) 구문을 활용한 DB Flusher 멱등성(Idempotency) 확보 및 크래시 복구 시 데이터 무결성 완벽 보장
 * **Phase 45**: Chaos Engineering - Consumer(Rust) 강제 종료 및 재기동 시 데이터 유실률 0% (Zero-Downtime Hot-Reload) 아키텍처 검증 완료
@@ -104,3 +134,8 @@ $stream = $client.GetStream();
 $stream.Write([BitConverter]::GetBytes([long]99999), 0, 8);
 $client.Close();
 ```
+
+### 5. Web Dashboard (eGovFrame)
+* **IDE**: IntelliJ IDEA (with Smart Tomcat Plugin)
+* **Access**: `http://localhost:8080/egovSampleList.do`
+* **Note**: 엔진이 가동 중이어야 실시간 데이터를 확인할 수 있습니다.
