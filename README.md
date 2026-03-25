@@ -38,6 +38,9 @@ JDK 22+의 FFM API와 Rust를 결합하여 언어의 경계를 허물고, 하드
 
 ### 🟧 [Season 3] Scalability & Connectivity (2026.03 ~ )
 
+## ⏸️ Phase 55: Kill-Switch & TOP 5 Spike Ranking
+- **Live Pause Engine (Kill-Switch)**: 초당 100건 이상 쏟아지는 실시간 데이터를 분석하기 위해, 화면 렌더링을 즉시 동결(Freeze)시키는 PAUSE 스위치 구현. (백엔드 파이프라인은 무중단 유지)
+- **Session TOP 5 Hall of Fame**: 관제 세션 동안 발생한 가장 높은 위험 수치(Spike) 5개를 실시간으로 추출하고 내림차순 정렬하여 우측 하단 전광판에 영구 기록하는 랭킹 보드 탑재.
 ## 🚨 Phase 54: Live TPS Meter & Alert Terminal
 - **Real-Time TPS Engine**: JavaScript로 이전 Fetch 주기와의 Sequence 편차를 계산하여, 현재 파이프라인의 초당 DB 처리량(Transactions Per Second)을 화면에 실시간으로 출력 (평균 100~120 TPS 달성).
 - **Cyberpunk Alert Terminal**: Rust가 생성한 난수 데이터 중 임계치(50130 이상)를 돌파하는 Spike 발생 시, 즉각적으로 하단 터미널 UI에 `[CRITICAL]` 경고 로그를 누적시키는 실시간 이상 감지(Anomaly Detection) UI 구현.
