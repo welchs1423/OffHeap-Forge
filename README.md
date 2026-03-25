@@ -47,6 +47,7 @@ JDK 22+의 FFM API와 Rust를 결합하여 언어의 경계를 허물고, 하드
 - **Persistent Storage**: 볼륨 마운팅을 통해 컨테이너 재시작 시 데이터 및 계정 정보 유지 설정.
 - **JSON Endpoint**: Spring MVC 기반 실시간 데이터 자판기 개통 (`/api/forge/liveData.do`).
 - **Tech Stack**: JDK 25, eGovFrame 4.3, Jackson Databind, Oracle 21c XE.
+---
 * **Phase 49**: JDK 25 기반의 Off-heap 엔진 데이터를 eGovFrame WebUI로 실시간 이식 성공 (Legacy Modernization)
 * **Phase 48**: Modern Legacy - eGovFrame 4.3 프로젝트 생성 및 JDK 25 환경 이식 완료 (Lombok 제거 및 정통 Spring DI 전환)
 * **Phase 47**: Prometheus & Grafana 연동을 통한 실시간 초당 처리량(TPS) 모니터링 대시보드 구축 완료
