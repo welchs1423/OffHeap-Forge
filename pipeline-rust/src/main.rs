@@ -3,34 +3,38 @@ use std::net::TcpStream;
 use std::thread;
 use std::time::Duration;
 
-fn main() -> std::io::Result<()> {
-    println!("🚀 [Rust Factory] 가동 준비 완료!");
-    println!("⏳ Java 엔진(Port 9999)으로 연결을 시도합니다...");
-
-    // 1. 자바가 열어둔 9999 포트로 쳐들어갑니다!
-    let mut stream = TcpStream::connect("127.0.0.1:9999")?;
-    println!("🔌 [Network] Java 엔진과 TCP 연결 성공! 데이터 폭격을 시작합니다!");
+fn main() {
+    println!("🚀 [Rust Factory] 불사조(Auto-Reconnect) 모드 가동!");
 
     let mut seq = 1u64;
 
+    // 1. 바깥쪽 무한 루프 (죽어도 다시 살아남)
     loop {
-        // 2. 가짜 데이터(숫자)를 미친 듯이 생성합니다. (50000 ~ 50100 사이 뺑뺑이)
-        let val: u64 = 50000 + (seq % 100);
+        println!("⏳ Java 엔진(Port 9999)으로 연결을 시도합니다...");
 
-        // 3. 자바가 좋아하는 Little Endian 8바이트로 포장합니다.
-        let bytes = val.to_le_bytes();
+        match TcpStream::connect("127.0.0.1:9999") {
+            Ok(mut stream) => {
+                println!("🔌 [Network] Java 엔진과 TCP 연결 성공! 데이터 폭격 시작!");
 
-        // 4. 자바(9999 포트)로 냅다 던집니다!
-        if let Err(e) = stream.write_all(&bytes) {
-            println!("⚠️ 전송 실패 (자바가 꺼졌나요?): {}", e);
-            break;
+                // 2. 안쪽 루프 (정상적일 때 데이터 폭격)
+                loop {
+                    let val: u64 = 50000 + ((seq.wrapping_mul(137) % 150) as u64);
+                    let bytes = val.to_le_bytes();
+
+                    // 자바가 꺼져서 전송에 실패하면 안쪽 루프를 깨고 바깥쪽(재접속)으로 나감!
+                    if let Err(e) = stream.write_all(&bytes) {
+                        println!("⚠️ 전송 실패 (자바가 꺼진 듯?): {}", e);
+                        break;
+                    }
+
+                    seq += 1;
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
+            Err(e) => {
+                println!("❌ 연결 실패 (자바 켜는 중...?): {}. 3초 뒤 재시도...", e);
+                thread::sleep(Duration::from_secs(3));
+            }
         }
-
-        seq += 1;
-
-        // 너무 빠르면 화면에서 보기 힘드니까 0.01초(10ms)마다 쏩니다. (초당 100개!)
-        thread::sleep(Duration::from_millis(10));
     }
-
-    Ok(())
 }

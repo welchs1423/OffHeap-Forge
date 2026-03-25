@@ -11,6 +11,7 @@ import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import jdk.incubator.vector.LongVector;
 import jdk.incubator.vector.VectorSpecies;
 
@@ -72,21 +73,37 @@ public class ForgeMain {
             feedbackWatcher.setDaemon(true);
             feedbackWatcher.start();
 
+            // 🔥 [Phase 53] 예열 시간 0초! Oracle DB에서 가장 높은 SEQ_ID를 가져오는 스마트 복구 엔진
+            long dbMaxSeq = 0;
+            System.out.println("🔍 [Smart Recovery] DB에서 마지막으로 작업한 위치를 찾습니다...");
+            try {
+                java.util.Properties props = new java.util.Properties();
+                props.put("user", "system");
+                props.put("password", "oracle");
+                props.put("oracle.net.CONNECT_TIMEOUT", "3000");
+                String url = "jdbc:oracle:thin:@127.0.0.1:1522/XEPDB1";
+
+                try (Connection conn = DriverManager.getConnection(url, props);
+                     PreparedStatement pstmt = conn.prepareStatement("SELECT NVL(MAX(SEQ_ID), 0) FROM FORGE_METRICS");
+                     ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        dbMaxSeq = rs.getLong(1);
+                    }
+                }
+                System.out.println("✅ [Smart Recovery] Oracle DB 최신 SEQ_ID 확인 완료: " + dbMaxSeq);
+            } catch (Exception e) {
+                System.err.println("⚠️ [Smart Recovery] DB 조회 실패 (0번부터 시작합니다): " + e.getMessage());
+            }
+
             PaddedSequence head = new PaddedSequence();
             PaddedSequence tail = new PaddedSequence();
 
-            long recovered = 0;
-            for (int i = 0; i < 1024; i++) {
-                if (ringBuffer.getAtIndex(ValueLayout.JAVA_LONG, i) != 0) { recovered++; }
-                else { break; }
-            }
-            if (recovered > 0) {
-                head.set(recovered);
-                tail.set(recovered);
-                System.out.println("🔥 [Crash Recovery] Restored " + recovered + " messages from Disk!");
-            }
+            // 🔥 과거의 유령(Sequence Overlap) 번호를 쫓아가지 않고, DB 최신 번호로 즉시 덮어씌움!
+            head.set(dbMaxSeq);
+            tail.set(dbMaxSeq);
+            final long startHead = dbMaxSeq;
 
-            final long startHead = recovered;
+            System.out.println("🚀 [Engine] 시퀀스 " + dbMaxSeq + " 번부터 딜레이 없이 즉시 가동합니다!");
 
             HttpServer metricsServer = HttpServer.create(new InetSocketAddress(9090), 0);
             metricsServer.createContext("/metrics", exchange -> {
@@ -166,7 +183,6 @@ public class ForgeMain {
             dbFlusher.setDaemon(true);
             dbFlusher.start();
 
-            // 🔥 원본 복구: 아주 완벽했던 생산자-소비자 모델로 돌아갑니다.
             Thread consumer = new Thread(() -> {
                 while (true) {
                     while (tail.get() == head.get()) { Thread.onSpinWait(); }
@@ -192,28 +208,36 @@ public class ForgeMain {
                         SocketChannel client = serverChannel.accept();
                         client.configureBlocking(false);
                         client.register(selector, SelectionKey.OP_READ);
-                        // 🔥 CCTV 1번: 러스트가 자바(9999포트)에 들어오면 무조건 찍힙니다!
                         System.out.println("🔌 [Network] Rust 클라이언트 연결 감지! (데이터 수신 대기 중...)");
                     } else if (key.isReadable()) {
                         SocketChannel client = (SocketChannel) key.channel();
                         ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
-                        int bytesRead = client.read(buffer);
+                        int bytesRead = -1;
+
+                        try {
+                            bytesRead = client.read(buffer);
+                        } catch (java.io.IOException e) {
+                            System.out.println("🔌 [Network] Rust 클라이언트 연결 끊김. (다음 연결 대기 중...)");
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
 
                         if (bytesRead > 0) {
                             buffer.flip();
                             long currentTail = tail.get();
-                            if (currentTail - head.get() < 1024) {
-                                int index = (int)(currentTail & 1023);
-                                if (buffer.remaining() >= 8) {
-                                    ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, index, buffer.getLong());
-                                    tail.set(currentTail + 1);
-                                    ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, 1024, tail.get());
-                                }
+
+                            // 무한히 증가하는 tail값을 1024로 나눈 나머지로 인덱스 변환! (Bitwise AND 연산)
+                            int index = (int)(currentTail & 1023);
+
+                            if (buffer.remaining() >= 8) {
+                                ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, index, buffer.getLong());
+                                tail.set(currentTail + 1);
+                                ringBuffer.setAtIndex(ValueLayout.JAVA_LONG, 1024, tail.get());
                             }
                         } else if (bytesRead == -1) {
-                            // 🔥 CCTV 2번: 러스트가 도망가면 찍힙니다.
-                            System.out.println("🔌 [Network] Rust 클라이언트 연결 종료.");
+                            System.out.println("🔌 [Network] Rust 클라이언트 정리 완료.");
                             client.close();
+                            key.cancel();
                         }
                     }
                 }

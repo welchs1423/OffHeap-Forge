@@ -37,6 +37,13 @@ JDK 22+의 FFM API와 Rust를 결합하여 언어의 경계를 허물고, 하드
 ## 📅 업데이트 내역
 
 ### 🟧 [Season 3] Scalability & Connectivity (2026.03 ~ )
+## 🧠 Phase 53: Smart Recovery Engine (Zero-Delay Startup)
+- **Sequence Overlap 방어**: Java 엔진 재가동 시 발생하는 1024 버퍼 리셋 및 DB MERGE 충돌(과거 데이터 무시 현상) 원인 규명.
+- **Auto-Sync DB Max ID**: Java 기동 시 Oracle DB에 `SELECT MAX(SEQ_ID)` 쿼리를 날려 마지막 작업 위치를 즉시 동기화. 예열 및 지연 시간(Delay)을 0초로 단축하여 즉각적인 실시간 파이프라인 가동 구현.
+- **Rust Auto-Reconnect**: Rust 생산자(Producer)에 `TcpStream` 기반 자동 재접속(Auto-Reconnect) 루프를 탑재하여, Java Consumer의 상태와 무관하게 무중단(Fault-tolerant) 데이터 전송 보장.
+## 🚀 Phase 52: Real-Time Cyberpunk Dashboard (Chart.js)
+- **100ms Ultra-Low Latency Polling**: Spring Web MVC(JSP)와 AJAX(`fetch`)를 활용하여 0.1초 단위로 Oracle DB의 최신 메트릭을 렌더링.
+- **Cache Busting & Live Graph**: 타임스탬프 쿼리스트링(`?_=...`)을 통해 브라우저 캐시를 무효화하고, Chart.js를 연동하여 Rust에서 생성된 데이터 스파이크를 실시간 심전도(Line Chart) 형태로 시각화.
 ## Phase 51: Full-Stack Real-Time Pipeline Integration
 - **Rust Producer (Data Factory)**: TCP 소켓(Port 9999)을 통해 초당 100건의 실시간 메트릭 데이터를 생성 및 전송하는 클라이언트 구축.
 - **Java SIMD Consumer**: Zero-contention 네트워크 엔진으로 Rust의 데이터를 수신하고, C++ Native Timer 기반의 프로파일링과 함께 SIMD 가속을 활용하여 Oracle DB에 초고속 Batch Insert(MERGE) 수행.
